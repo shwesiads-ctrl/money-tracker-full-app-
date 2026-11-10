@@ -1,0 +1,19 @@
+# Never commit database credentials or private exports
+/private/config.local.php
+/private/config.*.php
+/private/backups/*
+!/private/backups/.htaccess
+*.sql.gz
+*.sql.zip
+*.bak
+*.backup
+.env
+.env.*
+!.env.example
+*.log
+/vendor/
+/node_modules/
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
