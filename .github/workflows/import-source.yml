@@ -1,0 +1,30 @@
+name: Import Money Tracker source
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.bootstrap/money-tracker-source.b64'
+permissions:
+  contents: write
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract verified source package
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 -d .bootstrap/money-tracker-source.b64 > /tmp/money-tracker-source.tar.xz
+          mkdir -p /tmp/money-tracker-source
+          tar -xJf /tmp/money-tracker-source.tar.xz -C /tmp/money-tracker-source
+          test -f /tmp/money-tracker-source/index.php
+          test -f /tmp/money-tracker-source/schema.sql
+          test -f /tmp/money-tracker-source/.gitignore
+          cp -a /tmp/money-tracker-source/. ./
+          rm -f .bootstrap/money-tracker-source.b64
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: import Money Tracker Full App v1.0 source"
+          git push
