@@ -1,5 +1,7 @@
 # Money Tracker — Full Database App (v1.0)
 
+> ⚠️ **Repository upload status:** Setup files and documentation are published, but the application source files have **not yet been pushed**. Download the prepared source ZIP from the ChatGPT conversation and push it to this repository before following the installation instructions below.
+
 A responsive Myanmar/English personal finance tracker based on the supplied mobile UI. **This is a server-backed app (not an offline-only HTML demo).** Runs on Windows XAMPP or a PHP/MariaDB web host.
 
 ## Requirements
