@@ -65,7 +65,8 @@ export function filterTransactions(items: Transaction[], args: {currency: Curren
  */
 export function monthlyComparison(items: Transaction[], endMonth: string, count = 6) {
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(endMonth) || count < 1 || count > 24) throw new Error('Invalid chart range');
-  const [year, month] = endMonth.split('-').map(Number);
+  const year = Number(endMonth.slice(0, 4));
+  const month = Number(endMonth.slice(5, 7));
   const months = Array.from({length: count}, (_, i) => {
     const d = new Date(Date.UTC(year, month - count + i, 1));
     return {month: `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2, '0')}`, income: 0, expense: 0};
