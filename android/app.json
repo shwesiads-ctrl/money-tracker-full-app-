@@ -10,9 +10,14 @@
       "versionCode": 1,
       "permissions": []
     },
-    "ios": { "bundleIdentifier": "com.shwesiads.moneytracker" },
-    "plugins": ["expo-sqlite"],
-    "newArchEnabled": true,
-    "extra": { "localOnly": true }
+    "ios": {
+      "bundleIdentifier": "com.shwesiads.moneytracker"
+    },
+    "plugins": [
+      "expo-sqlite"
+    ],
+    "extra": {
+      "localOnly": true
+    }
   }
 }
