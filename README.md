@@ -1,3 +1,17 @@
+# Money Tracker Android v2.3 — Reminders & About
+
+## What's new (v2.3)
+
+- Native on-device notifications, **opt-in** permission; daily transaction reminder and monthly report review reminder.
+- User-created one-time reminders with locally entered date/time and delete action.
+- Test notification button (about 10 seconds).
+- Private lock-screen notifications: no amounts, notes or custom reminder titles.
+- About Software page: Money Tracker 2.3.0; developer Myominaung (Myanmar), +959256060722, Telegram @kominit, email linkstar2012@gmail.com.
+- SQLite migration is additive; login/profile and financial transactions are preserved during APK update.
+- OS may delay delivery due to battery optimizations. Internet and cloud push are not needed.
+- **Backup limitation**: existing finance JSON exports do not include scheduled reminders or notification preferences; these remain in the local SQLite database until removed. Do not uninstall without backing up financial records.
+- Android 13+ asks for POST_NOTIFICATIONS at first opt-in.
+
 # Money Tracker Android — React Native + TypeScript
 
 Offline-first Myanmar/English money tracker for Android, using Expo SDK 58, React Native 0.88 and SQLite.
@@ -80,7 +94,7 @@ No Android APK was generated inside the sandbox: no Android SDK + npm network ac
 - No changes to database identity (`money-tracker-ts.db`) or Android package ID; user data remains stored locally.
 - **Signing warning:** CI testing APKs may use different ephemeral signing keys. If Android refuses to update an existing installation, export a JSON backup from the current version *before* uninstalling it, then restore after installing the new APK.
 
-## v2.2 — Local full-profile login & Android UX fixes
+## v2.3 — Local full-profile login & Android UX fixes
 
 - First launch registration with username, display name, 10+ character password, and one-time **160-bit recovery key** (store offline).
 - Local login with PBKDF2-HMAC-SHA256 (120,000 iterations, per-secret random salt), secure device keystore storage, and persistent failed-attempt backoff.

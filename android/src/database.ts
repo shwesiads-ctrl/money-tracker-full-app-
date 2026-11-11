@@ -1,4 +1,5 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
+import { initReminders } from './notifications';
 import { assertTransaction, id, parseBackup, toMinor } from './core';
 import type { AppPrefs, BackupV2, Budget, Category, Currency, Snapshot, Transaction, TransactionInput, Wallet } from './types';
 
@@ -13,7 +14,7 @@ const categoryPairs: Array<[string,string,string,Category['kind']]> = [
   ['Shopping','Shopping','ဈေးဝယ်','expense'],
   ['Salary','Salary / Income','လစာ/ဝင်ငွေ','income'],
   ['Other','Other','အခြား','both'],
-]; 
+];
 export const initialCategories: Category[] = categoryPairs.map(([code,name_en,name_my,kind],sort_order)=>({code,name_en,name_my,kind:kind as Category['kind'],sort_order,active:1 as const}));
 
 const schema = `
@@ -55,7 +56,8 @@ export async function initDatabase(db: SQLiteDatabase): Promise<void> {
   for (const [key,value] of Object.entries({language:'my',currency:'MMK',dark_mode:'false',show_wallets:'true'})) {
     await db.runAsync('INSERT OR IGNORE INTO app_settings(key,value) VALUES (?,?)',key,value);
   }
-  await db.execAsync('PRAGMA user_version = 1;');
+  await initReminders(db);
+  await db.execAsync('PRAGMA user_version = 2;');
 }
 const insertWallet = (db: SQLiteDatabase, w: Wallet) => db.runAsync(
   'INSERT INTO wallets(code,name,active,sort_order,opening_mmk_minor,opening_usd_minor) VALUES (?,?,?,?,?,?)',

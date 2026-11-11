@@ -10,6 +10,8 @@ import { tr } from './i18n';
 import type { AppPrefs, Category, CategoryKind, Currency, Snapshot, Transaction, TransactionInput, TransactionType } from './types';
 import type {Account} from './account';
 import ProfileSettings from './ProfileSettings';
+import ReminderSettings from './ReminderSettings';
+import AboutPanel from './AboutPanel';
 
 const light = { bg:'#f5f7fb',panel:'#ffffff',surface:'#f1f5f9',text:'#0f172a',muted:'#64748b',border:'#e2e8f0',accent:'#059669',accentSoft:'#ecfdf5',softText:'#475569',input:'#f8fafc',red:'#e11d48',green:'#059669' };
 const dark = { bg:'#0b1421',panel:'#111e2d',surface:'#1b2d40',text:'#f4f7fb',muted:'#9baec4',border:'#294156',accent:'#22c55e',accentSoft:'#163b33',softText:'#bfd0e1',input:'#152536',red:'#fb7185',green:'#4ade80' };
@@ -274,6 +276,7 @@ export default function Tracker({account,onLock,onUpdateProfile,onChangePassword
   </>;
 
   const settings=<>
+    <ReminderSettings db={db} lang={prefs.language} c={c}/>
     <ProfileSettings account={account} language={prefs.language} onLock={onLock} onUpdateProfile={onUpdateProfile} onChangePassword={onChangePassword} onRegenerateRecovery={onRegenerateRecovery} onBiometric={onBiometric}/>
     <Panel c={c}><SectionHeader c={c}>{t.settings}</SectionHeader>
       <Label c={c} color={c.muted} size={12} style={{marginBottom:7}}>{t.language}</Label><Chips c={c} value={prefs.language} onChange={v=>changePrefs({language:v as 'en'|'my'})} options={[{value:'my',label:'မြန်မာ'},{value:'en',label:'English'}]}/>
@@ -311,7 +314,8 @@ export default function Tracker({account,onLock,onUpdateProfile,onChangePassword
       })}/><View style={{height:11}}/>
       <Action c={c} tone="danger" label={t.clear} onPress={()=>Alert.alert(t.clear,t.clearWarn,[{text:t.cancel,style:'cancel'},{text:t.delete,style:'destructive',onPress:()=>void act(()=>clearTransactions(db),true)}])}/>
     </Panel>
-    <Label c={c} color={c.muted} size={11} style={{textAlign:'center',marginBottom:10}}>Money Tracker v2.2 · TypeScript · Expo SQLite · Offline</Label>
+    <AboutPanel lang={prefs.language} c={c}/>
+    <Label c={c} color={c.muted} size={11} style={{textAlign:'center',marginBottom:10}}>Money Tracker v2.3 · TypeScript · Expo SQLite · Offline</Label>
   </>;
 
   if(!snapshot)return <SafeAreaView style={{flex:1,backgroundColor:c.bg,alignItems:'center',justifyContent:'center'}}><ActivityIndicator color={c.accent}/></SafeAreaView>;

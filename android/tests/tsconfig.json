@@ -17,6 +17,8 @@
     "../src/types.ts",
     "./core.test.ts",
     "../src/authPolicy.ts",
-    "./authPolicy.test.ts"
+    "./authPolicy.test.ts",
+    "../src/reminderPolicy.ts",
+    "./reminderPolicy.test.ts"
   ]
 }
