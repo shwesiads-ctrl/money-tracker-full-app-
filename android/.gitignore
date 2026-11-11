@@ -1,0 +1,17 @@
+node_modules/
+.expo/
+android/
+ios/
+.env
+.env.*
+!.env.example
+*.keystore
+*.jks
+*.apk
+*.aab
+*.log
+*.sqlite
+*.db
+build/
+dist/
+tests/out/

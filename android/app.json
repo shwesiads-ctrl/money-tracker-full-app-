@@ -1,0 +1,18 @@
+{
+  "expo": {
+    "name": "Money Tracker",
+    "slug": "money-tracker-ts",
+    "version": "2.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "android": {
+      "package": "com.shwesiads.moneytracker",
+      "versionCode": 1,
+      "permissions": []
+    },
+    "ios": { "bundleIdentifier": "com.shwesiads.moneytracker" },
+    "plugins": ["expo-sqlite"],
+    "newArchEnabled": true,
+    "extra": { "localOnly": true }
+  }
+}
