@@ -2,13 +2,15 @@
   "expo": {
     "name": "Money Tracker",
     "slug": "money-tracker-ts",
-    "version": "2.3.0",
+    "version": "2.4.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "android": {
       "package": "com.shwesiads.moneytracker",
-      "versionCode": 4,
-      "permissions": ["POST_NOTIFICATIONS"],
+      "versionCode": 5,
+      "permissions": [
+        "POST_NOTIFICATIONS"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#071621"

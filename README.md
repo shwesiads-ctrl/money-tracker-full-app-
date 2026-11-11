@@ -1,3 +1,11 @@
+# Money Tracker Android v2.4 — Back Key & Pull-to-Refresh
+
+- Android Back: on non-Home pages return to Home; on Home show an Exit confirmation with Cancel and OK. Only OK exits.
+- On login/registration show exit confirmation; Recovery Back returns to Login; Recovery Key reveal warns before exit.
+- Pull down on Dashboard, History, Reports and Settings to refresh the current local SQLite snapshot, updating totals, charts and lists without a network request or data mutation.
+- App version 2.4.0, Android versionCode 5; package ID and SQLite database name remain unchanged.
+- Back-navigation policy tests included; full Android device interaction QA still required. Back up valuable financial data before updating.
+
 # Money Tracker Android v2.3 — Reminders & About
 
 ## What's new (v2.3)

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, SafeAreaView, ScrollView, Image, StatusBar as RNStatusBar, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, BackHandler, KeyboardAvoidingView, Platform, RefreshControl, SafeAreaView, ScrollView, Image, StatusBar as RNStatusBar, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import type { ReactNode } from 'react';
 import { useSQLiteContext } from 'expo-sqlite';
 import { StatusBar } from 'expo-status-bar';
@@ -12,6 +12,8 @@ import type {Account} from './account';
 import ProfileSettings from './ProfileSettings';
 import ReminderSettings from './ReminderSettings';
 import AboutPanel from './AboutPanel';
+import { mainBackAction } from './backPolicy';
+import { confirmExit } from './exitDialog';
 
 const light = { bg:'#f5f7fb',panel:'#ffffff',surface:'#f1f5f9',text:'#0f172a',muted:'#64748b',border:'#e2e8f0',accent:'#059669',accentSoft:'#ecfdf5',softText:'#475569',input:'#f8fafc',red:'#e11d48',green:'#059669' };
 const dark = { bg:'#0b1421',panel:'#111e2d',surface:'#1b2d40',text:'#f4f7fb',muted:'#9baec4',border:'#294156',accent:'#22c55e',accentSoft:'#163b33',softText:'#bfd0e1',input:'#152536',red:'#fb7185',green:'#4ade80' };
@@ -118,6 +120,7 @@ export default function Tracker({account,onLock,onUpdateProfile,onChangePassword
   const [snapshot,setSnapshot]=useState<Snapshot|null>(null);
   const [page,setPage]=useState<Page>('home');
   const [busy,setBusy]=useState(false);
+  const [refreshing,setRefreshing]=useState(false);
   const [editingId,setEditingId]=useState<string|null>(null);
   const [form,setForm]=useState(formDefault);
   const [search,setSearch]=useState('');
@@ -137,6 +140,14 @@ export default function Tracker({account,onLock,onUpdateProfile,onChangePassword
 
   const refresh=useCallback(async()=>{setSnapshot(await readSnapshot(db));},[db]);
   useEffect(()=>{void refresh().catch(e=>Alert.alert('Database error',String(e)));},[refresh]);
+  // Re-read the local SQLite snapshot when the user swipes down at the top.
+  const onPullToRefresh=useCallback(async()=>{
+    if(refreshing||busy)return;
+    setRefreshing(true);
+    try { await refresh(); }
+    catch(e){Alert.alert('Database error',e instanceof Error?e.message:String(e));}
+    finally {setRefreshing(false);}
+  },[refresh,refreshing,busy]);
   const prefs:AppPrefs=snapshot?.settings||{language:'my',currency:'MMK',dark_mode:false,show_wallets:true};
   const c=prefs.dark_mode?dark:light;
   const t=tr(prefs.language);
@@ -188,6 +199,15 @@ export default function Tracker({account,onLock,onUpdateProfile,onChangePassword
     setEditingId(null);setPage('home');setForm(formDefault());
   },true);
   const updateType=(next:Mode)=>{setForm(f=>({...f,type:next,category:categories.find(x=>x.active===1&&(x.kind===next||x.kind==='both'))?.code||'Other'}));};
+  useEffect(()=>{
+    if(Platform.OS!=='android')return;
+    const listener=BackHandler.addEventListener('hardwareBackPress',()=>{
+      if(mainBackAction(page)==='goHome')setPage('home');
+      else confirmExit(prefs.language);
+      return true;
+    });
+    return ()=>listener.remove();
+  },[page,prefs.language]);
   const selectedOpening=wallets.find(w=>w.code===openingEdit);
   const openBalance=(code:string)=>{const w=wallets.find(x=>x.code===code);if(!w)return;setOpeningEdit(code);setOpeningText(fromMinor(currency==='MMK'?w.opening_mmk_minor:w.opening_usd_minor,currency));};
 
@@ -332,7 +352,9 @@ export default function Tracker({account,onLock,onUpdateProfile,onChangePassword
     <StatusBar style={prefs.dark_mode?'light':'dark'}/>
     {header}
     <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==='ios'?'padding':undefined}>
-      <ScrollView key={page} keyboardShouldPersistTaps="handled" style={{flex:1}} contentContainerStyle={{paddingHorizontal:15,paddingTop:16,paddingBottom:34}}>{screen}</ScrollView>
+      <ScrollView key={page} keyboardShouldPersistTaps="handled" style={{flex:1}}
+        refreshControl={page==='add'?undefined:<RefreshControl refreshing={refreshing} onRefresh={()=>void onPullToRefresh()} colors={[c.accent]} tintColor={c.accent} progressBackgroundColor={c.panel} />}
+        contentContainerStyle={{paddingHorizontal:15,paddingTop:16,paddingBottom:34}}>{screen}</ScrollView>
     </KeyboardAvoidingView>
     <View style={{backgroundColor:c.panel,borderTopWidth:1,borderColor:c.border,paddingTop:7,paddingBottom:Platform.OS==='android'?28:12,paddingHorizontal:4}}>
       <View style={{flexDirection:'row',alignItems:'flex-start',height:82}}>

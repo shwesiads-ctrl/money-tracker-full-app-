@@ -1,13 +1,13 @@
 {
   "name": "money-tracker-android-typescript",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "private": true,
   "main": "node_modules/expo/AppEntry.js",
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
     "typecheck": "tsc --noEmit",
-    "test:core": "tsc -p tests/tsconfig.json && node tests/out/tests/core.test.js && node tests/out/tests/authPolicy.test.js && node tests/out/tests/reminderPolicy.test.js"
+    "test:core": "tsc -p tests/tsconfig.json && node tests/out/tests/core.test.js && node tests/out/tests/authPolicy.test.js && node tests/out/tests/reminderPolicy.test.js && node tests/out/tests/backPolicy.test.js"
   },
   "dependencies": {
     "expo": "~58.0.0",

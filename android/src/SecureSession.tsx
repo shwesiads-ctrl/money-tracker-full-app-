@@ -1,9 +1,11 @@
 import React,{useEffect,useRef,useState} from 'react';
-import {ActivityIndicator,Alert,AppState,Image,KeyboardAvoidingView,Platform,ScrollView,StatusBar,Switch,Text,TextInput,TouchableOpacity,View} from 'react-native';
+import {ActivityIndicator,Alert,AppState,BackHandler,Image,KeyboardAvoidingView,Platform,ScrollView,StatusBar,Switch,Text,TextInput,TouchableOpacity,View} from 'react-native';
 import {createAccount,getAccount,login,recoverAccount,changePassword,regenerateRecoveryKey,updateProfile,setBiometric,biometricLogin,chooseAvatar} from './account';
 import type {Account} from './account';
 import Tracker from './Tracker';
 import {normalizeUsername} from './authPolicy';
+import {sessionBackAction} from './backPolicy';
+import {confirmExit} from './exitDialog';
 
 const color={bg:'#0b1421',card:'#111e2d',input:'#1b2d40',border:'#294156',accent:'#22c55e',muted:'#9baec4'};
 type Screen='loading'|'register'|'reveal'|'login'|'recovery'|'open';
@@ -23,6 +25,18 @@ export default function SecureSession(){
   const enter=(a:Account)=>{setAccount(a);setUsername(a.username);setPassword('');setKey('');locked.current=false;lastTouch.current=Date.now();setScreen('open');setError('');};
   useEffect(()=>{let mounted=true;void getAccount().then(a=>{if(!mounted)return;setAccount(a);if(a)setUsername(a.username);setScreen(a?'login':'register');}).catch(e=>{if(mounted){setError(String(e));setScreen('loading');}});return()=>{mounted=false;};},[]);
   useEffect(()=>{const sub=AppState.addEventListener('change',state=>{if(state!=='active')lastBackground.current=Date.now();else if(!locked.current&&lastBackground.current&&Date.now()-lastBackground.current>=60000)lock();});const timer=setInterval(()=>{if(!locked.current&&Date.now()-lastTouch.current>=5*60*1000)lock();},15000);return()=>{sub.remove();clearInterval(timer);};},[]);
+  useEffect(()=>{
+    if(Platform.OS!=='android'||screen==='open')return;
+    const listener=BackHandler.addEventListener('hardwareBackPress',()=>{
+      const action=sessionBackAction(screen);
+      if(action==='goLogin') {setScreen('login');setPassword('');setKey('');setError('');}
+      else if(action==='confirmExit') confirmExit('my',screen==='reveal'
+        ? 'Recovery Key ကို မသိမ်းရသေးလျှင် ပြန်ကြည့်၍ မရနိုင်ပါ။ အက်ပ်မှ ထွက်ရန် သေချာပါသလား?'
+        : undefined);
+      return true;
+    });
+    return ()=>listener.remove();
+  },[screen]);
   const run=async(fn:()=>Promise<void>)=>{if(busy)return;setError('');setBusy(true);try{await fn();}catch(e){setError(e instanceof Error?e.message:String(e));}finally{setBusy(false);}};
   const register=()=>void run(async()=>{if(password!==confirm)throw new Error('Passwords do not match.');const r=await createAccount(username,name,password);setAccount(r.account);setRecoveryKey(r.recoveryKey);setPassword('');setConfirm('');setScreen('reveal');});
   const doLogin=()=>void run(async()=>enter(await login(username,password)));
