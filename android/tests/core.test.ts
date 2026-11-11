@@ -1,4 +1,4 @@
-import { assertTransaction, categoryTotals, dailyTotals, filterTransactions, formatMoney, fromMinor, isValidDate, makeBackup, makeCsv, parseBackup, toMinor, totals, walletBalance } from '../src/core';
+import { assertTransaction, categoryTotals, dailyTotals, filterTransactions, formatMoney, fromMinor, isValidDate, makeBackup, makeCsv, monthlyComparison, parseBackup, toMinor, totals, walletBalance } from '../src/core';
 import type { Snapshot, Transaction } from '../src/types';
 
 const eq = (actual: unknown, expected: unknown, label: string) => {
@@ -35,4 +35,15 @@ test('CSV formula injection protected',()=>{const csv=makeCsv(sample.transaction
 test('backup v2 roundtrip',()=>{const back=makeBackup(sample);eq(parseBackup(back).transactions.length,4,'count');eq(back.format,'money-tracker-ts-backup','format');});
 test('reject malformed backup and broken wallet refs',()=>{const b=makeBackup(sample);b.transactions[0]!.wallet_code='Nonexistent';throws(()=>parseBackup(b),'broken refs');throws(()=>parseBackup({format:'unknown'}),'bad type');});
 test('legacy PHP backup import',()=>{const old={format:'money-tracker-backup',version:1, wallets:[{code:'Cash',name:'Cash',opening_mmk:'2000.00',opening_usd:'1.50',active:'1',sort_order:0}],categories:[{code:'Food',name_en:'Food',name_my:'စား',kind:'expense',active:'1',sort_order:0}],transactions:[{date:'2026-11-10',type:'expense',amount:'1250.00',currency:'MMK',description:'Tea',wallet_code:'Cash',category_code:'Food'}],budgets:[{currency:'MMK',amount:'300000.00'}],settings:{language:'my',currency:'MMK',dark_mode:'0',show_wallets:'1'}};const b=parseBackup(old);eq(b.transactions[0]!.amount_minor,1250,'legacy amount');eq(b.wallets[0]!.opening_usd_minor,150,'legacy usd opening');eq(b.settings.dark_mode,false,'legacy bool');});
+test('6 month chart includes calendar rollover and excludes transfers',()=>{
+  const m=monthlyComparison(sample.transactions.filter(t=>t.currency==='MMK'),'2027-01',4);
+  eq(m.map(x=>x.month),['2026-10','2026-11','2026-12','2027-01'],'months');
+  eq(m[1]!.income,5000,'income');
+  eq(m[1]!.expense,1200,'expense');
+  eq(m[0]!.income,0,'empty month');
+});
+test('chart rejects invalid month range',()=>{
+  throws(()=>monthlyComparison([],'2026-99'),'bad month');
+  throws(()=>monthlyComparison([],'2026-01',0),'invalid count');
+});
 console.log(`${passed} core tests passed`);

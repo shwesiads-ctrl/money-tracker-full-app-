@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, SafeAreaView, ScrollView, StatusBar as RNStatusBar, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, SafeAreaView, ScrollView, Image, StatusBar as RNStatusBar, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import type { ReactNode } from 'react';
 import { useSQLiteContext } from 'expo-sqlite';
 import { StatusBar } from 'expo-status-bar';
 import { addCategory, addWallet, clearTransactions, deleteTransaction, readSnapshot, restoreBackup, setBudget, setCategoryActive, setPrefs, setWalletActive, setWalletOpening, upsertTransaction } from './database';
-import { categoryTotals, dailyTotals, dateToday, filterTransactions, formatMoney, fromMinor, isValidDate, monthToday, toMinor, totals, walletBalance } from './core';
+import { categoryTotals, dailyTotals, dateToday, filterTransactions, formatMoney, monthlyComparison, fromMinor, isValidDate, monthToday, toMinor, totals, walletBalance } from './core';
 import { exportBackup, exportCsv, selectBackup } from './export';
 import { tr } from './i18n';
 import type { AppPrefs, Category, CategoryKind, Currency, Snapshot, Transaction, TransactionInput, TransactionType } from './types';
@@ -36,6 +36,61 @@ function MoneyTag({value,currency,color,c,size=18}: {value:number;currency:Curre
 function Bar({pct,c,color}: {pct:number;c:Palette;color:string}){
   return <View style={{height:8,borderRadius:8,backgroundColor:c.surface,overflow:'hidden'}}><View style={{height:'100%',width:`${Math.max(0,Math.min(100,pct))}%`,backgroundColor:color,borderRadius:8}}/></View>;
 }
+type MonthStat = ReturnType<typeof monthlyComparison>[number];
+function FinancialChart({data,c,lang,currency}: {data:MonthStat[];c:Palette;lang:'my'|'en';currency:Currency}) {
+  const [selected,setSelected]=useState<string|null>(null);
+  const current = data[data.length - 1];
+  const chosen = data.find(m=>m.month===selected) || current;
+  const maxValue = Math.max(1, ...data.flatMap(x=>[x.income,x.expense]));
+  const both = (current?.income || 0) + (current?.expense || 0);
+  const incomePct = both > 0 ? Math.round((current?.income || 0) * 100 / both) : 0;
+  const caption = lang==='my' ? 'ဝင်ငွေ / ထွက်ငွေ နှိုင်းယှဉ်ချက်' : 'Income vs Expenses';
+  const trendTitle = lang==='my' ? 'နောက်ဆုံး ၆ လစာ အခြေအနေ' : 'Last 6 Months';
+  const currentText = lang==='my' ? 'ယခုလ' : 'This month';
+  return <Panel c={c}>
+    <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:10}}>
+      <SectionHeader c={c}>{caption}</SectionHeader>
+      <Label c={c} size={10} color={c.muted} weight="700">{currency}</Label>
+    </View>
+    <View style={{flexDirection:'row',justifyContent:'space-between',gap:10,marginBottom:8}}>
+      <View style={{flex:1}}><Label c={c} color={c.muted} size={11}>{lang==='my'?'ဝင်ငွေ':'Income'}</Label><MoneyTag c={c} currency={currency} value={current?.income || 0} color={c.green} size={15}/></View>
+      <View style={{flex:1,alignItems:'flex-end'}}><Label c={c} color={c.muted} size={11}>{lang==='my'?'ထွက်ငွေ':'Expense'}</Label><MoneyTag c={c} currency={currency} value={current?.expense || 0} color={c.red} size={15}/></View>
+    </View>
+    <View style={{height:12,borderRadius:10,overflow:'hidden',backgroundColor:c.surface,flexDirection:'row',marginBottom:5}}>
+      {both>0&&<><View style={{width:`${incomePct}%`,backgroundColor:c.green}}/><View style={{flex:1,backgroundColor:c.red}}/></>}
+    </View>
+    <Label c={c} size={10} color={c.muted} style={{marginBottom:14}}>{both>0?`${incomePct}% ${lang==='my'?'ဝင်ငွေ':'income'}  ·  ${100-incomePct}% ${lang==='my'?'ထွက်ငွေ':'expense'}`:(lang==='my'?'ယခုလ စာရင်းမရှိသေးပါ':'No records this month')}</Label>
+    <View style={{height:1,backgroundColor:c.border,marginBottom:12}}/>
+    <Label c={c} color={c.softText} weight="700" size={12}>{trendTitle}</Label>
+    <View style={{flexDirection:'row',justifyContent:'space-between',gap:5,marginTop:11}}>
+      {data.map((entry,i)=>{
+        const active=chosen?.month===entry.month;
+        const monthLabel=entry.month.slice(5);
+        const incomeHeight=entry.income?Math.max(6,Math.round(entry.income*93/maxValue)):0;
+        const expenseHeight=entry.expense?Math.max(6,Math.round(entry.expense*93/maxValue)):0;
+        return <TouchableOpacity key={entry.month} accessibilityRole="button" accessibilityLabel={`${entry.month} ${lang==='my'?'ဝင်ငွေ':'income'} ${formatMoney(entry.income,currency)}, ${lang==='my'?'ထွက်ငွေ':'expense'} ${formatMoney(entry.expense,currency)}`} accessibilityState={{selected:active}} onPress={()=>setSelected(entry.month)} activeOpacity={0.7} style={{flex:1,minWidth:0,paddingHorizontal:2,paddingVertical:5,alignItems:'center',borderRadius:9,backgroundColor:active?c.accentSoft:'transparent'}}>
+          <View style={{height:99,flexDirection:'row',alignItems:'flex-end',justifyContent:'center',gap:3}}>
+            <View style={{height:incomeHeight,width:11,borderTopLeftRadius:4,borderTopRightRadius:4,backgroundColor:c.green,opacity:active?1:.85}}/>
+            <View style={{height:expenseHeight,width:11,borderTopLeftRadius:4,borderTopRightRadius:4,backgroundColor:c.red,opacity:active?1:.85}}/>
+          </View>
+          <Label c={c} size={10} color={active?c.accent:c.muted} weight={active?'800':'500'}>{monthLabel}</Label>
+        </TouchableOpacity>;
+      })}
+    </View>
+    <View style={{flexDirection:'row',gap:14,justifyContent:'center',marginTop:4,marginBottom:12}}>
+      <View style={{flexDirection:'row',alignItems:'center',gap:5}}><View style={{width:9,height:9,borderRadius:3,backgroundColor:c.green}}/><Label c={c} color={c.muted} size={11}>{lang==='my'?'ဝင်ငွေ':'Income'}</Label></View>
+      <View style={{flexDirection:'row',alignItems:'center',gap:5}}><View style={{width:9,height:9,borderRadius:3,backgroundColor:c.red}}/><Label c={c} color={c.muted} size={11}>{lang==='my'?'ထွက်ငွေ':'Expense'}</Label></View>
+    </View>
+    {chosen&&<View style={{padding:10,backgroundColor:c.surface,borderRadius:12}}>
+      <Label c={c} size={11} color={c.softText} weight="700">{chosen.month===current?.month?`${currentText} · `:''}${chosen.month}</Label>
+      <View style={{flexDirection:'row',gap:6,justifyContent:'space-between',marginTop:3}}>
+        <Label c={c} size={11} color={c.green} weight="700">+ {formatMoney(chosen.income,currency)}</Label>
+        <Label c={c} size={11} color={c.red} weight="700">− {formatMoney(chosen.expense,currency)}</Label>
+      </View>
+    </View>}
+  </Panel>;
+}
+
 function TransactionRow({tx,s,c,lang,onEdit,onDelete}: {tx:Transaction;s:Snapshot;c:Palette;lang:'my'|'en';onEdit:(t:Transaction)=>void;onDelete:(t:Transaction)=>void}){
   const moneycolor=tx.type==='income'?c.green:tx.type==='expense'?c.red:c.muted;
   const cat=s.categories.find(x=>x.code===tx.category_code);
@@ -89,6 +144,7 @@ export default function Tracker(){
   const currencyTx=useMemo(()=>snapshot?filterTransactions(snapshot.transactions,{currency}):[],[snapshot,currency]);
   const monthTx=useMemo(()=>currencyTx.filter(x=>x.date.slice(0,7)===currentMonth),[currencyTx,currentMonth]);
   const monthTotal=totals(monthTx);
+  const chartData=useMemo(()=>monthlyComparison(currencyTx,currentMonth,6),[currencyTx,currentMonth]);
   const overallTotal=totals(currencyTx);
   const balance=snapshot?wallets.reduce((n,w)=>n+walletBalance(snapshot,w.code,currency),0):0;
   const budget=snapshot?.budgets.find(b=>b.currency===currency)?.amount_minor||0;
@@ -130,8 +186,9 @@ export default function Tracker(){
   const selectedOpening=wallets.find(w=>w.code===openingEdit);
   const openBalance=(code:string)=>{const w=wallets.find(x=>x.code===code);if(!w)return;setOpeningEdit(code);setOpeningText(fromMinor(currency==='MMK'?w.opening_mmk_minor:w.opening_usd_minor,currency));};
 
-  const header=<View style={{paddingHorizontal:19,paddingTop:10,paddingBottom:12,flexDirection:'row',alignItems:'center',justifyContent:'space-between',borderColor:c.border,borderBottomWidth:1,backgroundColor:c.panel}}>
-    <View style={{flex:1}}><Label c={c} size={10} weight="700" color={c.accent}>{t.welcome}</Label><Label c={c} size={19} weight="800">{t.title}</Label></View>
+  const header=<View style={{paddingHorizontal:15,paddingTop:11,paddingBottom:12,flexDirection:'row',alignItems:'center',justifyContent:'space-between',borderColor:c.border,borderBottomWidth:1,backgroundColor:c.panel}}>
+    <Image source={require('../assets/icon.png')} style={{width:39,height:39,borderRadius:11,marginRight:10}}/>
+    <View style={{flex:1,minWidth:0}}><Label c={c} size={10} lines={1} weight="700" color={c.accent}>{t.welcome}</Label><Label c={c} size={19} weight="800">{t.title}</Label></View>
     <View style={{gap:5,alignItems:'flex-end'}}><TouchableOpacity onPress={()=>changePrefs({language:prefs.language==='en'?'my':'en'})}><Label c={c} color={c.accent} weight="800" size={12}>{prefs.language==='my'?'မြန်မာ ▾':'EN ▾'}</Label></TouchableOpacity>
     <TouchableOpacity onPress={()=>selectCurrency(currency==='MMK'?'USD':'MMK')}><Label c={c} size={12} weight="800" color={c.muted}>{currency==='MMK'?'Ks ⇄ USD':'USD ⇄ Ks'}</Label></TouchableOpacity></View>
   </View>;
@@ -151,6 +208,7 @@ export default function Tracker(){
         <Bar c={c} pct={budgetPercent} color={budgetPercent>=100?'#f43f5e':budgetPercent>=75?'#fbbf24':'#10b981'}/>
       </View>
     </View>
+    <FinancialChart c={c} currency={currency} data={chartData} lang={prefs.language}/>
     {prefs.show_wallets&&<Panel c={c}><SectionHeader c={c}>{t.wallets}</SectionHeader><View style={{flexDirection:'row',flexWrap:'wrap',gap:9}}>{wallets.map(w=>
       <View key={w.code} style={{width:'47%',flexGrow:1,padding:12,backgroundColor:c.surface,borderRadius:15}}><Label c={c} color={c.muted} size={11}>{w.name}</Label><MoneyTag value={walletBalance(snapshot!,w.code,currency)} currency={currency} c={c} color={walletBalance(snapshot!,w.code,currency)<0?c.red:c.green} size={14}/></View>
     )}</View></Panel>}
@@ -249,13 +307,18 @@ export default function Tracker(){
       })}/><View style={{height:11}}/>
       <Action c={c} tone="danger" label={t.clear} onPress={()=>Alert.alert(t.clear,t.clearWarn,[{text:t.cancel,style:'cancel'},{text:t.delete,style:'destructive',onPress:()=>void act(()=>clearTransactions(db),true)}])}/>
     </Panel>
-    <Label c={c} color={c.muted} size={11} style={{textAlign:'center',marginBottom:10}}>Money Tracker v2.0 · TypeScript · Expo SQLite · Offline</Label>
+    <Label c={c} color={c.muted} size={11} style={{textAlign:'center',marginBottom:10}}>Money Tracker v2.1 · TypeScript · Expo SQLite · Offline</Label>
   </>;
 
   if(!snapshot)return <SafeAreaView style={{flex:1,backgroundColor:c.bg,alignItems:'center',justifyContent:'center'}}><ActivityIndicator color={c.accent}/></SafeAreaView>;
   const screen=page==='home'?home:page==='add'?add:page==='history'?history:page==='reports'?reports:settings;
-  const nav:{id:Page;label:string;icon:string}[]=[
-    {id:'home',label:t.home,icon:'⌂'},{id:'add',label:t.add,icon:'+'},{id:'history',label:t.history,icon:'≡'},{id:'reports',label:t.reports,icon:'▥'},{id:'settings',label:t.settings,icon:'⚙'},
+  // Short labels prevent clipped/overlapping Myanmar glyphs on small Android screens.
+  const nav:{id:Page;label:string;fullLabel:string;icon:string}[]=[
+    {id:'home',label:prefs.language==='my'?'ပင်မ':'Home',fullLabel:t.home,icon:'⌂'},
+    {id:'history',label:prefs.language==='my'?'စာရင်း':'History',fullLabel:t.history,icon:'☷'},
+    {id:'add',label:prefs.language==='my'?'ထည့်':'Add',fullLabel:t.add,icon:'+'},
+    {id:'reports',label:prefs.language==='my'?'ဂရပ်':'Reports',fullLabel:t.reports,icon:'▥'},
+    {id:'settings',label:prefs.language==='my'?'ချိန်ညှိ':'Settings',fullLabel:t.settings,icon:'⚙'},
   ];
   return <SafeAreaView style={{flex:1,backgroundColor:c.bg,paddingTop:Platform.OS==='android'?RNStatusBar.currentHeight||0:0}}>
     <StatusBar style={prefs.dark_mode?'light':'dark'}/>
@@ -263,7 +326,18 @@ export default function Tracker(){
     <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==='ios'?'padding':undefined}>
       <ScrollView key={page} keyboardShouldPersistTaps="handled" style={{flex:1}} contentContainerStyle={{paddingHorizontal:15,paddingTop:16,paddingBottom:34}}>{screen}</ScrollView>
     </KeyboardAvoidingView>
-    <View style={{flexDirection:'row',backgroundColor:c.panel,borderTopWidth:1,borderColor:c.border,paddingVertical:6,paddingHorizontal:5,paddingBottom:Platform.OS==='android'?12:8}}>{nav.map(n=><TouchableOpacity accessibilityRole="tab" accessibilityState={{selected:page===n.id}} key={n.id} onPress={()=>n.id==='add'?goToAdd():setPage(n.id)} style={{flex:1,alignItems:'center',justifyContent:'center',padding:5,borderRadius:13,backgroundColor:page===n.id?c.accentSoft:'transparent'}}><Label c={c} size={21} color={page===n.id?c.accent:c.muted} weight="800">{n.icon}</Label><Label c={c} size={10} color={page===n.id?c.accent:c.muted} weight={page===n.id?'800':'500'} lines={1}>{n.label}</Label></TouchableOpacity>)}</View>
+    <View style={{flexDirection:'row',backgroundColor:c.panel,borderTopWidth:1,borderColor:c.border,paddingTop:7,paddingHorizontal:6,paddingBottom:Platform.OS==='android'?14:10}}>
+      {nav.map(n=>{
+        const active=page===n.id;
+        const addButton=n.id==='add';
+        return <TouchableOpacity key={n.id} accessibilityRole="tab" accessibilityLabel={n.fullLabel} accessibilityState={{selected:active}} activeOpacity={0.75} onPress={()=>addButton?goToAdd():setPage(n.id)} style={{flex:1,minWidth:0,height:69,alignItems:'center',justifyContent:'center',gap:3,borderRadius:15,backgroundColor:active&&!addButton?c.accentSoft:'transparent'}}>
+          <View style={{width:addButton?38:31,height:addButton?38:31,borderRadius:addButton?19:12,backgroundColor:addButton?c.accent:(active?c.accentSoft:'transparent'),alignItems:'center',justifyContent:'center'}}>
+            <Text allowFontScaling={false} style={{fontSize:addButton?27:24,lineHeight:addButton?34:30,fontWeight:'700',color:addButton?'#ffffff':active?c.accent:c.muted,textAlign:'center',textAlignVertical:'center'}}>{n.icon}</Text>
+          </View>
+          <Text numberOfLines={1} ellipsizeMode="tail" style={{width:'100%',paddingHorizontal:1,textAlign:'center',includeFontPadding:true,fontSize:10.5,lineHeight:19,color:active?c.accent:c.muted,fontWeight:active?'800':'600'}}>{n.label}</Text>
+        </TouchableOpacity>;
+      })}
+    </View>
     {busy&&<View pointerEvents="none" style={{position:'absolute',right:16,top:Platform.OS==='android'?RNStatusBar.currentHeight||0:0}}><ActivityIndicator color={c.accent}/></View>}
   </SafeAreaView>;
 }

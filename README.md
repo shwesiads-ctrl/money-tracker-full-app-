@@ -72,3 +72,10 @@ npm run typecheck    # requires npm packages installed
 ```
 
 No Android APK was generated inside the sandbox: no Android SDK + npm network access were available. The GitHub Actions workflow has to run to produce the first verified APK.
+
+## v2.1 UI & branding improvements
+- Fixed 5-tab Android navigation: compact one-line Myanmar/English labels, larger touch areas, central Add action and accessible tab names.
+- New native Android app icon, adaptive launcher icon and Expo splash screen (SDK 58 plugin).
+- Dashboard includes live income-versus-expense proportion and a tappable six-month grouped bar chart using actual SQLite transaction records, with no fabricated amounts.
+- No changes to database identity (`money-tracker-ts.db`) or Android package ID; user data remains stored locally.
+- **Signing warning:** CI testing APKs may use different ephemeral signing keys. If Android refuses to update an existing installation, export a JSON backup from the current version *before* uninstalling it, then restore after installing the new APK.

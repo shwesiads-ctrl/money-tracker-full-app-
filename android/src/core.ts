@@ -60,6 +60,26 @@ export function filterTransactions(items: Transaction[], args: {currency: Curren
     && (!args.search || t.description.toLocaleLowerCase().includes(args.search.trim().toLocaleLowerCase())))
     .sort((a, b) => b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at) || b.id.localeCompare(a.id));
 }
+/** Summarize the last N calendar months, excluding wallet transfers.
+ * Caller should pass transactions already filtered to the active currency.
+ */
+export function monthlyComparison(items: Transaction[], endMonth: string, count = 6) {
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(endMonth) || count < 1 || count > 24) throw new Error('Invalid chart range');
+  const [year, month] = endMonth.split('-').map(Number);
+  const months = Array.from({length: count}, (_, i) => {
+    const d = new Date(Date.UTC(year, month - count + i, 1));
+    return {month: `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2, '0')}`, income: 0, expense: 0};
+  });
+  const lookup = new Map(months.map(x => [x.month, x]));
+  for (const tx of items) {
+    const slot = lookup.get(tx.date.slice(0, 7));
+    if (!slot) continue;
+    if (tx.type === 'income') slot.income += tx.amount_minor;
+    if (tx.type === 'expense') slot.expense += tx.amount_minor;
+  }
+  return months;
+}
+
 export function categoryTotals(items: Transaction[]) {
   const map = new Map<string, number>();
   for (const t of items) if (t.type === 'expense') map.set(t.category_code || 'Other', (map.get(t.category_code || 'Other') || 0) + t.amount_minor);

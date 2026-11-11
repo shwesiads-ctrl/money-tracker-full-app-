@@ -51,7 +51,7 @@ jobs:
       - name: Publish APK as workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: money-tracker-android-testing-apk
+          name: money-tracker-android-v2.1-testing-apk
           path: android/android/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
           retention-days: 14
