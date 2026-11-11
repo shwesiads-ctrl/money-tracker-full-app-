@@ -18,9 +18,9 @@ Offline-first Myanmar/English money tracker for Android, using Expo SDK 58, Reac
 
 ## Status
 
-- TypeScript financial-core tests **10/10 pass** in an offline Node.js environment.
-- React/React Native and native APK runtime tests **not yet verified**. Expo dependencies cannot be installed in this build sandbox due to no internet access.
-- `.github/workflows/android-apk.yml` builds a **testing-only APK** in GitHub Actions after source is pushed. GitHub may require Actions enabled and the workflow to be manually dispatched or fixed if upstream tool versions change.
+- Offline tests: **12/12 finance, 12/12 authentication, and 11/11 reminder-policy tests pass** (35/35).
+- Native Android APK compilation is checked by GitHub Actions. On-device reminder delivery, permission prompts and visual QA still require testing on an Android handset.
+- `.github/workflows/android-apk.yml` builds a **testing-only APK** in GitHub Actions after source is pushed, using a temporary testing signature (not a Play Store release).
 - **Not yet production ready**; review security, backups, UI, and real-device functionality before handling sensitive records.
 
 ## Features
@@ -32,7 +32,7 @@ Offline-first Myanmar/English money tracker for Android, using Expo SDK 58, Reac
 - Cash, KBZPay, WavePay, AYA Pay, CB Pay, Bank/Card, custom wallets/categories
 - Separate MMK and USD ledgers, *no automatic exchange-rate conversion*
 - Transaction search, filters, category and daily summaries, CSV export
-- Full-account JSON backup & restore (supports compatible PHP v1.0 backups)
+- Financial JSON backup & restore (supports compatible PHP v1.0 backups; reminder schedules are not included)
 
 ## Quick start
 
