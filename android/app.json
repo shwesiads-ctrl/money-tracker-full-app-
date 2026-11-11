@@ -2,12 +2,12 @@
   "expo": {
     "name": "Money Tracker",
     "slug": "money-tracker-ts",
-    "version": "2.1.0",
+    "version": "2.2.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "android": {
       "package": "com.shwesiads.moneytracker",
-      "versionCode": 2,
+      "versionCode": 3,
       "permissions": [],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -29,6 +29,14 @@
             "backgroundColor": "#071621",
             "image": "./assets/splash-icon.png"
           }
+        }
+      ],
+      "expo-secure-store",
+      "expo-local-authentication",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Choose a profile picture for your local Money Tracker account."
         }
       ]
     ],

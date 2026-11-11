@@ -79,3 +79,22 @@ No Android APK was generated inside the sandbox: no Android SDK + npm network ac
 - Dashboard includes live income-versus-expense proportion and a tappable six-month grouped bar chart using actual SQLite transaction records, with no fabricated amounts.
 - No changes to database identity (`money-tracker-ts.db`) or Android package ID; user data remains stored locally.
 - **Signing warning:** CI testing APKs may use different ephemeral signing keys. If Android refuses to update an existing installation, export a JSON backup from the current version *before* uninstalling it, then restore after installing the new APK.
+
+## v2.2 — Local full-profile login & Android UX fixes
+
+- First launch registration with username, display name, 10+ character password, and one-time **160-bit recovery key** (store offline).
+- Local login with PBKDF2-HMAC-SHA256 (120,000 iterations, per-secret random salt), secure device keystore storage, and persistent failed-attempt backoff.
+- Password reset with recovery key; a successful reset turns off biometrics until explicitly re-enabled.
+- Optional fingerprint/face sign-in via a device-authenticated SecureStore token. Requires enrolled device biometrics; password login remains available when biometric keys become invalid.
+- Editable display name, locally stored profile picture, change password, regenerate recovery key and lock/logout.
+- Lock when the app has been backgrounded for over 60 seconds or left idle for five minutes (app-level timeout).
+- Bottom navigation uses fixed-height icon/label slots and extra Android gesture-area padding to prevent Myanmar-script label collisions.
+- Preserves Android package `com.shwesiads.moneytracker` and SQLite name `money-tracker-ts.db` from v2.1.
+
+### Security limitations (read before using)
+
+The account is **single-device and offline**, not an online/remote account. It has no cloud sync, remote account recovery or multi-user separation; a future backend would be a separate project phase. Authentication gates the app UI but **does not encrypt the SQLite database itself**. For sensitive financial data, use phone encryption and a secure screen lock, and keep any JSON export/backup in encrypted storage. The recovery key is never emailed, stored in plain text or recoverable after dismissal; do not lose it. If both password and recovery key are lost, there is no guaranteed way to regain access without resetting app data. You should make a private JSON backup **before** installing a new build. Android APK updates require a matching signing certificate; never uninstall before backing up.
+
+### QA
+
+`npm run test:core` runs 12 finance and 12 auth validation cases. Full native Android biometric, profile picker, secure storage and SQLite upgrade tests require installation on a real device; passing CI alone is not a substitute.

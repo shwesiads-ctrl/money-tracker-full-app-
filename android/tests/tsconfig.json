@@ -1,4 +1,22 @@
 {
-  "compilerOptions": { "target": "ES2022", "module": "CommonJS", "moduleResolution": "node", "strict": true, "skipLibCheck": true, "outDir": "./out", "rootDir": "..", "lib": ["ES2022", "DOM"] },
-  "include": ["../src/core.ts", "../src/types.ts", "./core.test.ts"]
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "strict": true,
+    "skipLibCheck": true,
+    "outDir": "./out",
+    "rootDir": "..",
+    "lib": [
+      "ES2022",
+      "DOM"
+    ]
+  },
+  "include": [
+    "../src/core.ts",
+    "../src/types.ts",
+    "./core.test.ts",
+    "../src/authPolicy.ts",
+    "./authPolicy.test.ts"
+  ]
 }

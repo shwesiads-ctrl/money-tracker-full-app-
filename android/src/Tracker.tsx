@@ -8,6 +8,8 @@ import { categoryTotals, dailyTotals, dateToday, filterTransactions, formatMoney
 import { exportBackup, exportCsv, selectBackup } from './export';
 import { tr } from './i18n';
 import type { AppPrefs, Category, CategoryKind, Currency, Snapshot, Transaction, TransactionInput, TransactionType } from './types';
+import type {Account} from './account';
+import ProfileSettings from './ProfileSettings';
 
 const light = { bg:'#f5f7fb',panel:'#ffffff',surface:'#f1f5f9',text:'#0f172a',muted:'#64748b',border:'#e2e8f0',accent:'#059669',accentSoft:'#ecfdf5',softText:'#475569',input:'#f8fafc',red:'#e11d48',green:'#059669' };
 const dark = { bg:'#0b1421',panel:'#111e2d',surface:'#1b2d40',text:'#f4f7fb',muted:'#9baec4',border:'#294156',accent:'#22c55e',accentSoft:'#163b33',softText:'#bfd0e1',input:'#152536',red:'#fb7185',green:'#4ade80' };
@@ -108,7 +110,8 @@ function TransactionRow({tx,s,c,lang,onEdit,onDelete}: {tx:Transaction;s:Snapsho
 }
 
 const formDefault = () => ({type:'expense' as Mode, amount:'', description:'', date:dateToday(), wallet:'Cash', toWallet:'KBZPay', category:'Food'});
-export default function Tracker(){
+type AuthProps={account:Account;onLock:()=>void;onUpdateProfile:(name:string,photo:boolean)=>Promise<void>;onChangePassword:(oldPassword:string,newPassword:string)=>Promise<void>;onRegenerateRecovery:(password:string)=>Promise<string>;onBiometric:(enabled:boolean)=>Promise<void>};
+export default function Tracker({account,onLock,onUpdateProfile,onChangePassword,onRegenerateRecovery,onBiometric}:AuthProps){
   const db=useSQLiteContext();
   const [snapshot,setSnapshot]=useState<Snapshot|null>(null);
   const [page,setPage]=useState<Page>('home');
@@ -187,7 +190,7 @@ export default function Tracker(){
   const openBalance=(code:string)=>{const w=wallets.find(x=>x.code===code);if(!w)return;setOpeningEdit(code);setOpeningText(fromMinor(currency==='MMK'?w.opening_mmk_minor:w.opening_usd_minor,currency));};
 
   const header=<View style={{paddingHorizontal:15,paddingTop:11,paddingBottom:12,flexDirection:'row',alignItems:'center',justifyContent:'space-between',borderColor:c.border,borderBottomWidth:1,backgroundColor:c.panel}}>
-    <Image source={require('../assets/icon.png')} style={{width:39,height:39,borderRadius:11,marginRight:10}}/>
+    <TouchableOpacity accessibilityLabel="Open Profile" onPress={()=>setPage('settings')}><Image source={account.avatarUri?{uri:account.avatarUri}:require('../assets/icon.png')} style={{width:42,height:42,borderRadius:21,marginRight:10}}/></TouchableOpacity>
     <View style={{flex:1,minWidth:0}}><Label c={c} size={10} lines={1} weight="700" color={c.accent}>{t.welcome}</Label><Label c={c} size={19} weight="800">{t.title}</Label></View>
     <View style={{gap:5,alignItems:'flex-end'}}><TouchableOpacity onPress={()=>changePrefs({language:prefs.language==='en'?'my':'en'})}><Label c={c} color={c.accent} weight="800" size={12}>{prefs.language==='my'?'မြန်မာ ▾':'EN ▾'}</Label></TouchableOpacity>
     <TouchableOpacity onPress={()=>selectCurrency(currency==='MMK'?'USD':'MMK')}><Label c={c} size={12} weight="800" color={c.muted}>{currency==='MMK'?'Ks ⇄ USD':'USD ⇄ Ks'}</Label></TouchableOpacity></View>
@@ -271,6 +274,7 @@ export default function Tracker(){
   </>;
 
   const settings=<>
+    <ProfileSettings account={account} language={prefs.language} onLock={onLock} onUpdateProfile={onUpdateProfile} onChangePassword={onChangePassword} onRegenerateRecovery={onRegenerateRecovery} onBiometric={onBiometric}/>
     <Panel c={c}><SectionHeader c={c}>{t.settings}</SectionHeader>
       <Label c={c} color={c.muted} size={12} style={{marginBottom:7}}>{t.language}</Label><Chips c={c} value={prefs.language} onChange={v=>changePrefs({language:v as 'en'|'my'})} options={[{value:'my',label:'မြန်မာ'},{value:'en',label:'English'}]}/>
       <View style={{height:13}}/><Label c={c} color={c.muted} size={12}>{t.currency}</Label><Chips c={c} value={currency} onChange={v=>selectCurrency(v as Currency)} options={[{value:'MMK',label:'Myanmar Kyat (Ks)'},{value:'USD',label:'US Dollar ($)'}]}/>
@@ -307,7 +311,7 @@ export default function Tracker(){
       })}/><View style={{height:11}}/>
       <Action c={c} tone="danger" label={t.clear} onPress={()=>Alert.alert(t.clear,t.clearWarn,[{text:t.cancel,style:'cancel'},{text:t.delete,style:'destructive',onPress:()=>void act(()=>clearTransactions(db),true)}])}/>
     </Panel>
-    <Label c={c} color={c.muted} size={11} style={{textAlign:'center',marginBottom:10}}>Money Tracker v2.1 · TypeScript · Expo SQLite · Offline</Label>
+    <Label c={c} color={c.muted} size={11} style={{textAlign:'center',marginBottom:10}}>Money Tracker v2.2 · TypeScript · Expo SQLite · Offline</Label>
   </>;
 
   if(!snapshot)return <SafeAreaView style={{flex:1,backgroundColor:c.bg,alignItems:'center',justifyContent:'center'}}><ActivityIndicator color={c.accent}/></SafeAreaView>;
@@ -317,8 +321,8 @@ export default function Tracker(){
     {id:'home',label:prefs.language==='my'?'ပင်မ':'Home',fullLabel:t.home,icon:'⌂'},
     {id:'history',label:prefs.language==='my'?'စာရင်း':'History',fullLabel:t.history,icon:'☷'},
     {id:'add',label:prefs.language==='my'?'ထည့်':'Add',fullLabel:t.add,icon:'+'},
-    {id:'reports',label:prefs.language==='my'?'ဂရပ်':'Reports',fullLabel:t.reports,icon:'▥'},
-    {id:'settings',label:prefs.language==='my'?'ချိန်ညှိ':'Settings',fullLabel:t.settings,icon:'⚙'},
+    {id:'reports',label:prefs.language==='my'?'အစီရင်ခံ':'Reports',fullLabel:t.reports,icon:'▥'},
+    {id:'settings',label:prefs.language==='my'?'ဆက်တင်':'Settings',fullLabel:t.settings,icon:'⚙'},
   ];
   return <SafeAreaView style={{flex:1,backgroundColor:c.bg,paddingTop:Platform.OS==='android'?RNStatusBar.currentHeight||0:0}}>
     <StatusBar style={prefs.dark_mode?'light':'dark'}/>
@@ -326,17 +330,21 @@ export default function Tracker(){
     <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==='ios'?'padding':undefined}>
       <ScrollView key={page} keyboardShouldPersistTaps="handled" style={{flex:1}} contentContainerStyle={{paddingHorizontal:15,paddingTop:16,paddingBottom:34}}>{screen}</ScrollView>
     </KeyboardAvoidingView>
-    <View style={{flexDirection:'row',backgroundColor:c.panel,borderTopWidth:1,borderColor:c.border,paddingTop:7,paddingHorizontal:6,paddingBottom:Platform.OS==='android'?14:10}}>
-      {nav.map(n=>{
-        const active=page===n.id;
-        const addButton=n.id==='add';
-        return <TouchableOpacity key={n.id} accessibilityRole="tab" accessibilityLabel={n.fullLabel} accessibilityState={{selected:active}} activeOpacity={0.75} onPress={()=>addButton?goToAdd():setPage(n.id)} style={{flex:1,minWidth:0,height:69,alignItems:'center',justifyContent:'center',gap:3,borderRadius:15,backgroundColor:active&&!addButton?c.accentSoft:'transparent'}}>
-          <View style={{width:addButton?38:31,height:addButton?38:31,borderRadius:addButton?19:12,backgroundColor:addButton?c.accent:(active?c.accentSoft:'transparent'),alignItems:'center',justifyContent:'center'}}>
-            <Text allowFontScaling={false} style={{fontSize:addButton?27:24,lineHeight:addButton?34:30,fontWeight:'700',color:addButton?'#ffffff':active?c.accent:c.muted,textAlign:'center',textAlignVertical:'center'}}>{n.icon}</Text>
-          </View>
-          <Text numberOfLines={1} ellipsizeMode="tail" style={{width:'100%',paddingHorizontal:1,textAlign:'center',includeFontPadding:true,fontSize:10.5,lineHeight:19,color:active?c.accent:c.muted,fontWeight:active?'800':'600'}}>{n.label}</Text>
-        </TouchableOpacity>;
-      })}
+    <View style={{backgroundColor:c.panel,borderTopWidth:1,borderColor:c.border,paddingTop:7,paddingBottom:Platform.OS==='android'?28:12,paddingHorizontal:4}}>
+      <View style={{flexDirection:'row',alignItems:'flex-start',height:82}}>
+        {nav.map(n=>{
+          const active=page===n.id;
+          const addButton=n.id==='add';
+          return <TouchableOpacity key={n.id} accessibilityRole="tab" accessibilityLabel={n.fullLabel} accessibilityState={{selected:active}} activeOpacity={0.8} onPress={()=>addButton?goToAdd():setPage(n.id)} style={{flex:1,minWidth:0,height:80,alignItems:'center',justifyContent:'flex-start',paddingTop:5,borderRadius:14,backgroundColor:active&&!addButton?c.accentSoft:'transparent'}}>
+            <View style={{height:38,alignItems:'center',justifyContent:'center'}}>
+              <View style={{width:addButton?42:34,height:addButton?42:34,borderRadius:addButton?21:10,backgroundColor:addButton?c.accent:'transparent',alignItems:'center',justifyContent:'center'}}>
+                <Text allowFontScaling={false} style={{fontSize:addButton?27:25,lineHeight:addButton?33:31,fontWeight:'800',color:addButton?'#ffffff':active?c.accent:c.muted,textAlign:'center',textAlignVertical:'center'}}>{n.icon}</Text>
+              </View>
+            </View>
+            <Text allowFontScaling={false} adjustsFontSizeToFit numberOfLines={1} ellipsizeMode="tail" style={{width:'100%',height:29,paddingHorizontal:1,paddingTop:4,textAlign:'center',textAlignVertical:'center',includeFontPadding:true,fontSize:10.5,lineHeight:23,color:active?c.accent:c.muted,fontWeight:active?'800':'600'}}>{n.label}</Text>
+          </TouchableOpacity>;
+        })}
+      </View>
     </View>
     {busy&&<View pointerEvents="none" style={{position:'absolute',right:16,top:Platform.OS==='android'?RNStatusBar.currentHeight||0:0}}><ActivityIndicator color={c.accent}/></View>}
   </SafeAreaView>;
