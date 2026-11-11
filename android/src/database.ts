@@ -2,17 +2,19 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import { assertTransaction, id, parseBackup, toMinor } from './core';
 import type { AppPrefs, BackupV2, Budget, Category, Currency, Snapshot, Transaction, TransactionInput, Wallet } from './types';
 
-export const initialWallets: Wallet[] = [
+const walletPairs: Array<[string,string]> = [
   ['Cash','Cash'],['KBZPay','KBZPay'],['WavePay','WavePay'],['AYAPay','AYA Pay'],['CBPay','CB Pay'],['BankCard','Bank / Card'],
-].map(([code,name],sort_order)=>({code,name,sort_order,active:1 as const,opening_mmk_minor:0,opening_usd_minor:0}));
-export const initialCategories: Category[] = [
+ ];
+export const initialWallets: Wallet[] = walletPairs.map(([code,name],sort_order)=>({code,name,sort_order,active:1 as const,opening_mmk_minor:0,opening_usd_minor:0}));
+const categoryPairs: Array<[string,string,string,Category['kind']]> = [
   ['Food','Food & Drinks','အစားအသောက်','expense'],
   ['Transport','Transport','လမ်းစရိတ်','expense'],
   ['Bills','Bills & Top-up','ဘေလ်/ဖုန်းဘေလ်','expense'],
   ['Shopping','Shopping','ဈေးဝယ်','expense'],
   ['Salary','Salary / Income','လစာ/ဝင်ငွေ','income'],
   ['Other','Other','အခြား','both'],
-].map(([code,name_en,name_my,kind],sort_order)=>({code,name_en,name_my,kind:kind as Category['kind'],sort_order,active:1 as const}));
+]; 
+export const initialCategories: Category[] = categoryPairs.map(([code,name_en,name_my,kind],sort_order)=>({code,name_en,name_my,kind:kind as Category['kind'],sort_order,active:1 as const}));
 
 const schema = `
 CREATE TABLE IF NOT EXISTS wallets (

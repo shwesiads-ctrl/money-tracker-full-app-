@@ -258,7 +258,7 @@ export default function Tracker(){
     {id:'home',label:t.home,icon:'⌂'},{id:'add',label:t.add,icon:'+'},{id:'history',label:t.history,icon:'≡'},{id:'reports',label:t.reports,icon:'▥'},{id:'settings',label:t.settings,icon:'⚙'},
   ];
   return <SafeAreaView style={{flex:1,backgroundColor:c.bg,paddingTop:Platform.OS==='android'?RNStatusBar.currentHeight||0:0}}>
-    <StatusBar style={prefs.dark_mode?'light':'dark'} backgroundColor={c.panel}/>
+    <StatusBar style={prefs.dark_mode?'light':'dark'}/>
     {header}
     <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==='ios'?'padding':undefined}>
       <ScrollView key={page} keyboardShouldPersistTaps="handled" style={{flex:1}} contentContainerStyle={{paddingHorizontal:15,paddingTop:16,paddingBottom:34}}>{screen}</ScrollView>
