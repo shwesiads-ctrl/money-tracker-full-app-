@@ -17,6 +17,8 @@ import { mainBackAction } from './backPolicy';
 import { confirmExit } from './exitDialog';
 import {analyticsRange,shiftAnalyticsAnchor,analyticsBuckets} from './analytics';
 import type {AnalyticsPeriod} from './analytics';
+import {dashboardSummary,dashboardPeriodLabel} from './dashboardPeriod';
+import type {DashboardPeriod} from './dashboardPeriod';
 import {backDestination} from './settingsNavigation';
 import type {SettingsSection} from './settingsNavigation';
 import FeatureHub from './FeatureHub';
@@ -135,6 +137,8 @@ export default function Tracker({account,onLock,onUpdateProfile,onChangePassword
   const [page,setPage]=useState<Page>('home');
   const [settingsSection,setSettingsSection]=useState<SettingsSection|null>(null);
   const [analyticsPeriod,setAnalyticsPeriod]=useState<AnalyticsPeriod>('month');
+  const [dashboardPeriod,setDashboardPeriod]=useState<DashboardPeriod>('day');
+  const [dashboardPeriodOpen,setDashboardPeriodOpen]=useState(false);
   const [analyticsAnchor,setAnalyticsAnchor]=useState(dateToday);
   const [busy,setBusy]=useState(false);
   const [refreshing,setRefreshing]=useState(false);
@@ -185,6 +189,8 @@ export default function Tracker({account,onLock,onUpdateProfile,onChangePassword
   const currencyTx=useMemo(()=>snapshot?filterTransactions(snapshot.transactions,{currency}):[],[snapshot,currency]);
   const monthTx=useMemo(()=>currencyTx.filter(x=>x.date.slice(0,7)===currentMonth),[currencyTx,currentMonth]);
   const monthTotal=totals(monthTx);
+  const dashboardTotals=useMemo(()=>dashboardSummary(currencyTx,dashboardPeriod,dateToday()),[currencyTx,dashboardPeriod]);
+  const dashboardLabels=dashboardPeriodLabel(dashboardPeriod,prefs.language);
   const chartData=useMemo(()=>monthlyComparison(currencyTx,currentMonth,6),[currencyTx,currentMonth]);
   const overallTotal=totals(currencyTx);
   const balance=snapshot?wallets.reduce((n,w)=>n+walletBalance(snapshot,w.code,currency),0):0;
@@ -272,8 +278,22 @@ export default function Tracker({account,onLock,onUpdateProfile,onChangePassword
       <Label c={c} color="#ffffff" size={29} weight="800">{balance<0?'-':''}{formatMoney(balance,currency)}</Label>
       <View style={{height:1,backgroundColor:'#293749',marginVertical:16}}/>
       <View style={{flexDirection:'row',gap:10}}>
-        <View style={{flex:1,backgroundColor:'#1b2b3d',borderRadius:15,padding:11}}><Label c={c} color="#9bb0c4" size={11}>{t.monthlyIncome}</Label><MoneyTag c={c} value={monthTotal.income} currency={currency} color="#4ade80" size={15}/></View>
-        <View style={{flex:1,backgroundColor:'#1b2b3d',borderRadius:15,padding:11}}><Label c={c} color="#9bb0c4" size={11}>{t.monthlyExpense}</Label><MoneyTag c={c} value={monthTotal.expense} currency={currency} color="#fb7185" size={15}/></View>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel={dashboardLabels.income} accessibilityHint={prefs.language==='my'?'နေ့၊ ပတ်၊ လ၊ နှစ် ရွေးရန်':'Choose day, week, month or year'} onPress={()=>setDashboardPeriodOpen(v=>!v)} activeOpacity={0.8} style={{flex:1,backgroundColor:'#1b2b3d',borderRadius:15,padding:11,minHeight:80}}>
+          <Label c={c} color="#9bb0c4" size={11} weight="600">{dashboardLabels.income} ▾</Label>
+          <MoneyTag c={c} value={dashboardTotals.income} currency={currency} color="#4ade80" size={15}/>
+        </TouchableOpacity>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel={dashboardLabels.expense} accessibilityHint={prefs.language==='my'?'နေ့၊ ပတ်၊ လ၊ နှစ် ရွေးရန်':'Choose day, week, month or year'} onPress={()=>setDashboardPeriodOpen(v=>!v)} activeOpacity={0.8} style={{flex:1,backgroundColor:'#1b2b3d',borderRadius:15,padding:11,minHeight:80}}>
+          <Label c={c} color="#9bb0c4" size={11} weight="600">{dashboardLabels.expense} ▾</Label>
+          <MoneyTag c={c} value={dashboardTotals.expense} currency={currency} color="#fb7185" size={15}/>
+        </TouchableOpacity>
+      </View>
+      {dashboardPeriodOpen&&<View style={{marginTop:11,padding:11,borderRadius:14,backgroundColor:'#16263a'}}>
+        <Label c={c} color="#b5c6d6" size={11} weight="600">{prefs.language==='my'?'ကြည့်မည့်ကာလ ရွေးရန်':'Select time period'}</Label>
+        <View style={{flexDirection:'row',gap:6,marginTop:8}}>
+          {(['day','week','month','year'] as const).map(period=><TouchableOpacity key={period} accessibilityRole="button" accessibilityState={{selected:dashboardPeriod===period}} onPress={()=>{setDashboardPeriod(period);setDashboardPeriodOpen(false);}} style={{flex:1,alignItems:'center',justifyContent:'center',paddingVertical:10,backgroundColor:dashboardPeriod===period?'#16a34a':'#284056',borderRadius:10}}>
+            <Label c={c} size={11} weight="700" color="#ffffff">{prefs.language==='my'?({day:'နေ့',week:'ပတ်',month:'လ',year:'နှစ်'} as const)[period]:({day:'Day',week:'Week',month:'Month',year:'Year'} as const)[period]}</Label>
+          </TouchableOpacity>)}
+        </View>
       </View>
       <View style={{marginTop:16}}><View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginBottom:7}}>
         <Label c={c} color="#b5c6d6" size={11}>{t.budget}</Label><Label c={c} color={budgetPercent>=100?'#fb7185':'#4ade80'} size={11} weight="700">{budget>0?`${budgetPercent}%`:'—'} · {formatMoney(budget,currency)}</Label></View>

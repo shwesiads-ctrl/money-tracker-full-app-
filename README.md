@@ -10,3 +10,7 @@ Windows Tauri Desktop + Android v2.6 Cloud Preview.
 - **Limitations**: no automated bidirectional merge, no E2EE financial payloads, no production runtime QA; requires Firebase Console setup and two client rebuilds. Back up before syncing. Spark quotas apply.
 
 See `docs/DEPLOY.md` for setup and testing. No Firebase billing account/Blaze deployment required for this design.
+
+## v2.6.3 — Dashboard Period Cards
+
+Dashboard income/expense cards default to today's totals. Tap either card to choose Day / Week / Month / Year; labels and both amounts change together. Monday starts the week. Transfers do not contribute to income/expense. Existing monthly budget, reports, database and cloud preview remain unchanged. Android version code 12.

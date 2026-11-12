@@ -29,6 +29,8 @@
     "../src/analytics.ts",
     "./analytics.test.ts",
     "../src/settingsNavigation.ts",
-    "./settingsNavigation.test.ts"
+    "./settingsNavigation.test.ts",
+    "../src/dashboardPeriod.ts",
+    "./dashboardPeriod.test.ts"
   ]
 }
