@@ -151,7 +151,7 @@ function ensureCurrency(raw: unknown): Currency {
 }
 function ensurePrefs(raw: unknown): AppPrefs {
   if (!isObject(raw) || !['my', 'en'].includes(String(raw.language)) || !CURRENCIES.includes(raw.currency as Currency)) throw new Error('Invalid settings');
-  return { language: raw.language as 'my' | 'en', currency: raw.currency as Currency, dark_mode: backupBool(raw.dark_mode), show_wallets: backupBool(raw.show_wallets, true) };
+  return { language: raw.language as 'my' | 'en', currency: raw.currency as Currency, dark_mode: backupBool(raw.dark_mode), show_wallets: backupBool(raw.show_wallets, true), widget_show_balance: backupBool(raw.widget_show_balance, false) };
 }
 function normalizedSnapshot(data: Snapshot): Snapshot {
   if (data.wallets.length === 0 || data.categories.length === 0) throw new Error('Missing wallets/categories');

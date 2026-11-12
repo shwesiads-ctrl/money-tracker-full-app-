@@ -2,12 +2,12 @@
   "expo": {
     "name": "Money Tracker",
     "slug": "money-tracker-ts",
-    "version": "2.4.0",
+    "version": "2.5.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "android": {
       "package": "com.shwesiads.moneytracker",
-      "versionCode": 5,
+      "versionCode": 6,
       "permissions": [
         "POST_NOTIFICATIONS"
       ],
@@ -40,6 +40,26 @@
         "expo-image-picker",
         {
           "photosPermission": "Choose a profile picture for your local Money Tracker account."
+        }
+      ],
+      [
+        "expo-widgets",
+        {
+          "enableAndroid": true,
+          "widgets": [
+            {
+              "name": "MoneyWidget",
+              "displayName": "Money Tracker",
+              "description": "Privacy-friendly Money Tracker balance widget",
+              "android": {
+                "minWidth": 180,
+                "minHeight": 110,
+                "targetCellWidth": 4,
+                "targetCellHeight": 2,
+                "initialLayout": "./src/MoneyWidget.tsx"
+              }
+            }
+          ]
         }
       ]
     ],

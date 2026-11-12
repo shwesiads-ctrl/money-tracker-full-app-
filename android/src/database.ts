@@ -1,5 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { initReminders } from './notifications';
+import { initFeatures,clearFeatures,restoreFeatures,validateFeatureBackup } from './featureDb';
+import type {FeatureSnapshot} from './featureDb';
 import { assertTransaction, id, parseBackup, toMinor } from './core';
 import type { AppPrefs, BackupV2, Budget, Category, Currency, Snapshot, Transaction, TransactionInput, Wallet } from './types';
 
@@ -53,11 +55,12 @@ export async function initDatabase(db: SQLiteDatabase): Promise<void> {
   if ((wcount?.count || 0) === 0) for (const w of initialWallets) await insertWallet(db,w);
   if ((ccount?.count || 0) === 0) for (const c of initialCategories) await insertCategory(db,c);
   await db.runAsync("INSERT OR IGNORE INTO budgets(currency,amount_minor) VALUES ('MMK',300000),('USD',30000)");
-  for (const [key,value] of Object.entries({language:'my',currency:'MMK',dark_mode:'false',show_wallets:'true'})) {
+  for (const [key,value] of Object.entries({language:'my',currency:'MMK',dark_mode:'false',show_wallets:'true',widget_show_balance:'false'})) {
     await db.runAsync('INSERT OR IGNORE INTO app_settings(key,value) VALUES (?,?)',key,value);
   }
   await initReminders(db);
-  await db.execAsync('PRAGMA user_version = 2;');
+  await initFeatures(db);
+  await db.execAsync('PRAGMA user_version = 3;');
 }
 const insertWallet = (db: SQLiteDatabase, w: Wallet) => db.runAsync(
   'INSERT INTO wallets(code,name,active,sort_order,opening_mmk_minor,opening_usd_minor) VALUES (?,?,?,?,?,?)',
@@ -79,7 +82,7 @@ export async function readSnapshot(db: SQLiteDatabase): Promise<Snapshot> {
   ]);
   const settings=Object.fromEntries(rows.map(x=>[x.key,x.value]));
   const currency: Currency=settings.currency==='USD'?'USD':'MMK';
-  const prefs: AppPrefs={language:settings.language==='en'?'en':'my',currency,dark_mode:settings.dark_mode==='true',show_wallets:settings.show_wallets!=='false'};
+  const prefs: AppPrefs={language:settings.language==='en'?'en':'my',currency,dark_mode:settings.dark_mode==='true',show_wallets:settings.show_wallets!=='false',widget_show_balance:settings.widget_show_balance==='true'};
   return {wallets,categories,transactions,budgets,settings:prefs};
 }
 
@@ -105,7 +108,7 @@ export async function deleteTransaction(db: SQLiteDatabase, txId: string) {
 export async function clearTransactions(db: SQLiteDatabase) {await db.runAsync('DELETE FROM transactions');}
 export async function setPrefs(db: SQLiteDatabase, patch: Partial<AppPrefs>) {
   for(const [key,value] of Object.entries(patch)){
-    if (!['language','currency','dark_mode','show_wallets'].includes(key)) continue;
+    if (!['language','currency','dark_mode','show_wallets','widget_show_balance'].includes(key)) continue;
     await db.runAsync('INSERT INTO app_settings(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', key,String(value));
   }
 }
@@ -139,9 +142,11 @@ export async function setCategoryActive(db: SQLiteDatabase, code: string, active
   await db.runAsync('UPDATE categories SET active=? WHERE code=?',active?1:0,code);
 }
 
-export async function restoreBackup(db: SQLiteDatabase, raw: unknown): Promise<BackupV2> {
-  const backup=parseBackup(raw); // validate all rows and foreign refs BEFORE touching existing data
+export async function restoreBackup(db: SQLiteDatabase, raw: unknown, extensions?: unknown): Promise<BackupV2> {
+  const backup=parseBackup(raw);
+  const extras=extensions===undefined?undefined:validateFeatureBackup(extensions,backup); // validate all rows and foreign refs BEFORE touching existing data
   await db.withTransactionAsync(async()=> {
+    await clearFeatures(db);
     await db.runAsync('DELETE FROM transactions');
     await db.runAsync('DELETE FROM wallets');
     await db.runAsync('DELETE FROM categories');
@@ -153,6 +158,7 @@ export async function restoreBackup(db: SQLiteDatabase, raw: unknown): Promise<B
     for(const b of backup.budgets) await db.runAsync('INSERT INTO budgets(currency,amount_minor) VALUES (?,?)',b.currency,b.amount_minor);
     await db.runAsync("INSERT OR IGNORE INTO budgets(currency,amount_minor) VALUES ('MMK',300000),('USD',30000)");
     await setPrefs(db,backup.settings);
+    if(extras)await restoreFeatures(db,extras);
   });
   return backup;
 }

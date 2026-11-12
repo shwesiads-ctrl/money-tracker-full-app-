@@ -21,6 +21,8 @@
     "../src/reminderPolicy.ts",
     "./reminderPolicy.test.ts",
     "../src/backPolicy.ts",
-    "./backPolicy.test.ts"
+    "./backPolicy.test.ts",
+    "../src/featurePolicy.ts",
+    "./featurePolicy.test.ts"
   ]
 }

@@ -1,24 +1,23 @@
-# Build Android APK
+# Money Tracker Android v2.5 — Android build
 
-## Recommended: GitHub Actions (works with a phone browser)
+1. Check out the `main` branch. Node.js 22.13+, Java 17, Android SDK and Expo SDK 58 are required.
+2. In `android`, run `npm install && npm run test:core && npm run typecheck`.
+3. Run `npx expo prebuild --platform android --no-install`, then `cd android && ./gradlew :app:assembleRelease`.
+4. APK output: `android/android/app/build/outputs/apk/release/*.apk` from project root.
 
-1. Go to the **private GitHub repository** `shwesiads-ctrl/money-tracker-full-app-`.
-2. Tap **Actions**, open **Build Money Tracker Android APK**, then **Run workflow** if it has not started automatically.
-3. Open the latest successful workflow run and tap the `money-tracker-android-testing-apk` artifact.
-4. Unzip the artifact, install its APK on your Android phone, and test transactions/backup/restore.
+GitHub Actions publishes a prerelease asset at https://github.com/shwesiads-ctrl/money-tracker-full-app-/releases when the `main` build passes. Its repository is private, so you must sign in to GitHub. Back up money records before updating; do NOT uninstall the previous version.
 
-The repository workflow is at `.github/workflows/android-apk.yml`. It needs GitHub Actions enabled. Artifacts are kept for 14 days by this workflow.
+## Acceptance QA
 
-## Alternative: Expo EAS Build
+- v2.4 -> v2.5 install preserves username, login recovery, transactions, wallet balances, reminders and existing JSON backups.
+- Create, confirm-post, pause, delete recurring templates. Press confirm twice: second attempt must not duplicate the transaction.
+- Set category limits and verify progress after expense add/edit/delete; enable alerts and grant permission only when prompted.
+- Create borrowed/lent debt and partial repayments, reject excess repayment.
+- Create goal and contributions, verify wallet ledger unchanged.
+- Attach, replace and remove a receipt; verify private local path and encrypted backup/restore of photo.
+- Export an encrypted backup; wrong password / modified archive must fail, correct password must restore all features and receipts; legacy JSON import only after confirmation.
+- Export PDF and CSV of same filtered period; check Myanmar script rendering on target phone.
+- Add the home widget from Android launcher and test optional balance visibility. Check widget privacy while app is locked.
+- Check back confirmation, pull-to-refresh, notification delivery, device biometric unlock on real phones.
 
-```bash
-npm install
-npx eas-cli login
-npx eas-cli build -p android --profile preview
-```
-
-EAS prompts for linking to your Expo project and setting up signing credentials. Preview produces an APK according to `eas.json`.
-
-## Production releases
-
-Do not use a test/debug signing key for final distribution. Configure a permanent secure app signing identity, ensure you have control of the key, and perform device tests before release. A Play Store release usually uses AAB. This repository does not contain signing credentials.
+Phone / biometric / notification and widget runtime tests have not been performed in the sandbox; please report any screen or device-specific issues.

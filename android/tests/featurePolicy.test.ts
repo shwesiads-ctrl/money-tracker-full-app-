@@ -1,0 +1,16 @@
+import {nextDue,budgetLevel,remainingDebt,goalPercent,assertRecurring,assertAmount} from '../src/featurePolicy';
+let n=0;
+const ok=(v:boolean,m:string)=>{if(!v)throw new Error(m);n++;};
+const bad=(fn:()=>unknown,m:string)=>{try{fn();throw new Error('Expected rejection: '+m);}catch(e){if(e instanceof Error&&e.message.startsWith('Expected rejection'))throw e;n++;}};
+ok(nextDue('2026-01-31','monthly')==='2026-02-28','clamped monthly leap');
+ok(nextDue('2028-01-31','monthly')==='2028-02-29','leap February');
+ok(nextDue('2026-11-12','weekly')==='2026-11-19','weekly recurrence');
+bad(()=>nextDue('2026-02-30','monthly'),'bad due');
+ok(budgetLevel(0,100)==='ok','empty budget');ok(budgetLevel(75,100)==='watch','75% alert');
+ok(budgetLevel(90,100)==='warning','90% alert');ok(budgetLevel(100,100)==='limit','100% alert');
+ok(remainingDebt(100,[30,20])===50,'partial loan repayment');
+ok(remainingDebt(100,[100])===0,'full repayment');bad(()=>remainingDebt(100,[90,11]),'overpayment');
+ok(goalPercent(140,100)===100,'goal progress capped');
+bad(()=>assertAmount(-1),'negative amounts');
+bad(()=>assertRecurring({date:'2026-11-12',type:'transfer',currency:'MMK',amount_minor:300,description:'bad',wallet_code:'Cash',category_code:'Food',to_wallet_code:null,frequency:'monthly'}),'transfer not recurring');
+console.log(`${n} v2.5 feature policy tests passed`);

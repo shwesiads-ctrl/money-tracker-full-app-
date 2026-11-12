@@ -14,11 +14,19 @@ import ReminderSettings from './ReminderSettings';
 import AboutPanel from './AboutPanel';
 import { mainBackAction } from './backPolicy';
 import { confirmExit } from './exitDialog';
+import FeatureHub from './FeatureHub';
+import {readFeatures} from './featureDb';
+import type {Receipt} from './featureDb';
+import {attachReceipt,deleteReceipt} from './receipts';
+import {encryptedExport,encryptedRestore} from './secureBackup';
+import {exportPdf} from './pdfReport';
+import {updateMoneyWidget} from './widgetSync';
+import {checkCategoryBudgetThresholds} from './budgetNotify';
 
 const light = { bg:'#f5f7fb',panel:'#ffffff',surface:'#f1f5f9',text:'#0f172a',muted:'#64748b',border:'#e2e8f0',accent:'#059669',accentSoft:'#ecfdf5',softText:'#475569',input:'#f8fafc',red:'#e11d48',green:'#059669' };
 const dark = { bg:'#0b1421',panel:'#111e2d',surface:'#1b2d40',text:'#f4f7fb',muted:'#9baec4',border:'#294156',accent:'#22c55e',accentSoft:'#163b33',softText:'#bfd0e1',input:'#152536',red:'#fb7185',green:'#4ade80' };
 type Palette = typeof light;
-type Page = 'home'|'add'|'history'|'reports'|'settings';
+type Page = 'home'|'add'|'history'|'reports'|'settings'|'features';
 type Mode = TransactionType;
 type LabelProps = {children?:ReactNode; c:Palette; size?:number; weight?:'400'|'500'|'600'|'700'|'800'; color?:string; style?:object; lines?:number};
 function Label({children,c,size=13,weight='400',color,style,lines}:LabelProps){return <Text numberOfLines={lines} style={[{fontSize:size,color:color||c.text,fontWeight:weight,lineHeight:Math.ceil(size*1.85)},style]}>{children}</Text>;}
@@ -97,7 +105,7 @@ function FinancialChart({data,c,lang,currency}: {data:MonthStat[];c:Palette;lang
   </Panel>;
 }
 
-function TransactionRow({tx,s,c,lang,onEdit,onDelete}: {tx:Transaction;s:Snapshot;c:Palette;lang:'my'|'en';onEdit:(t:Transaction)=>void;onDelete:(t:Transaction)=>void}){
+function TransactionRow({tx,s,c,lang,onEdit,onDelete,onReceipt,receipt}: {tx:Transaction;s:Snapshot;c:Palette;lang:'my'|'en';onEdit:(t:Transaction)=>void;onDelete:(t:Transaction)=>void;onReceipt:(t:Transaction)=>void;receipt?:Receipt}){
   const moneycolor=tx.type==='income'?c.green:tx.type==='expense'?c.red:c.muted;
   const cat=s.categories.find(x=>x.code===tx.category_code);
   const wallet=s.wallets.find(w=>w.code===tx.wallet_code)?.name||tx.wallet_code;
@@ -108,6 +116,7 @@ function TransactionRow({tx,s,c,lang,onEdit,onDelete}: {tx:Transaction;s:Snapsho
     <View style={{flex:1}}><Label c={c} size={13} weight="700" lines={2}>{tx.description}</Label><Label c={c} size={10} color={c.muted} lines={2}>{tx.date} · {info}</Label></View>
     <View style={{alignItems:'flex-end',gap:4,maxWidth:'43%'}}><Label c={c} size={13} weight="800" color={moneycolor} lines={1}>{sign}{formatMoney(tx.amount_minor,tx.currency)}</Label><View style={{flexDirection:'row',gap:10}}>
       <TouchableOpacity onPress={()=>onEdit(tx)}><Label c={c} color={c.accent} size={11} weight="600">✎</Label></TouchableOpacity>
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Receipt photo" onPress={()=>onReceipt(tx)}><Label c={c} color={c.accent} size={11} weight="700">{receipt?'▧ ✓':'▧ +'}</Label></TouchableOpacity>
       <TouchableOpacity onPress={()=>onDelete(tx)}><Label c={c} color={c.red} size={11} weight="700">✕</Label></TouchableOpacity>
     </View></View>
   </View>;
@@ -121,6 +130,8 @@ export default function Tracker({account,onLock,onUpdateProfile,onChangePassword
   const [page,setPage]=useState<Page>('home');
   const [busy,setBusy]=useState(false);
   const [refreshing,setRefreshing]=useState(false);
+  const [receipts,setReceipts]=useState<Receipt[]>([]);
+  const [backupPassword,setBackupPassword]=useState('');
   const [editingId,setEditingId]=useState<string|null>(null);
   const [form,setForm]=useState(formDefault);
   const [search,setSearch]=useState('');
@@ -138,9 +149,15 @@ export default function Tracker({account,onLock,onUpdateProfile,onChangePassword
   const [categoryMY,setCategoryMY]=useState('');
   const [categoryKind,setCategoryKind]=useState<CategoryKind>('expense');
 
-  const refresh=useCallback(async()=>{setSnapshot(await readSnapshot(db));},[db]);
+  const refresh=useCallback(async()=>{
+    const next=await readSnapshot(db);
+    setSnapshot(next);
+    setReceipts((await readFeatures(db)).receipts);
+    updateMoneyWidget(next,next.settings.currency);
+  },[db]);
   useEffect(()=>{void refresh().catch(e=>Alert.alert('Database error',String(e)));},[refresh]);
-  // Re-read the local SQLite snapshot when the user swipes down at the top.
+  // Pull down from the top of a scrollable page to reload the latest local SQLite snapshot.
+  // This does not sync to a server or alter financial records.
   const onPullToRefresh=useCallback(async()=>{
     if(refreshing||busy)return;
     setRefreshing(true);
@@ -196,6 +213,7 @@ export default function Tracker({account,onLock,onUpdateProfile,onChangePassword
     const otherWallet=form.toWallet!==form.wallet?form.toWallet:activeWallets.find(x=>x.code!==form.wallet)?.code||'';
     const input:TransactionInput={id:editingId||undefined,type:kind,currency,date:form.date,amount_minor:toMinor(form.amount,currency),description:form.description.trim()|| (kind==='transfer'?(prefs.language==='my'?'ငွေလွှဲ':'Transfer'):'') ,wallet_code:form.wallet,to_wallet_code:kind==='transfer'?otherWallet:null,category_code:kind==='transfer'?null:categoryCode};
     await upsertTransaction(db,input);
+    await checkCategoryBudgetThresholds(db,currency,monthToday());
     setEditingId(null);setPage('home');setForm(formDefault());
   },true);
   const updateType=(next:Mode)=>{setForm(f=>({...f,type:next,category:categories.find(x=>x.active===1&&(x.kind===next||x.kind==='both'))?.code||'Other'}));};
@@ -204,7 +222,7 @@ export default function Tracker({account,onLock,onUpdateProfile,onChangePassword
     const listener=BackHandler.addEventListener('hardwareBackPress',()=>{
       if(mainBackAction(page)==='goHome')setPage('home');
       else confirmExit(prefs.language);
-      return true;
+      return true; // prevents Android from closing without an explicit OK
     });
     return ()=>listener.remove();
   },[page,prefs.language]);
@@ -217,7 +235,22 @@ export default function Tracker({account,onLock,onUpdateProfile,onChangePassword
     <View style={{gap:5,alignItems:'flex-end'}}><TouchableOpacity onPress={()=>changePrefs({language:prefs.language==='en'?'my':'en'})}><Label c={c} color={c.accent} weight="800" size={12}>{prefs.language==='my'?'မြန်မာ ▾':'EN ▾'}</Label></TouchableOpacity>
     <TouchableOpacity onPress={()=>selectCurrency(currency==='MMK'?'USD':'MMK')}><Label c={c} size={12} weight="800" color={c.muted}>{currency==='MMK'?'Ks ⇄ USD':'USD ⇄ Ks'}</Label></TouchableOpacity></View>
   </View>;
-  const txRows=(items:Transaction[])=>snapshot?items.map(tx=><TransactionRow key={tx.id} tx={tx} s={snapshot} c={c} lang={prefs.language} onEdit={editTx} onDelete={askDelete}/>):null;
+  const receiptAction=(tx:Transaction)=>{
+    const existing=receipts.find(r=>r.transaction_id===tx.id);
+    if(existing){
+      Alert.alert(prefs.language==='my'?'ဘောက်ချာပုံ':'Receipt photo',tx.description,[
+        {text:prefs.language==='my'?'မလုပ်တော့ပါ':'Cancel',style:'cancel'},
+        {text:prefs.language==='my'?'ပုံအသစ်ရွေး':'Replace photo',onPress:()=>void act(()=>attachReceipt(db,tx.id))},
+        {text:prefs.language==='my'?'ပုံဖျက်':'Remove photo',style:'destructive',onPress:()=>void act(()=>deleteReceipt(db,tx.id,existing.file_uri))}
+      ]);
+    }else void act(()=>attachReceipt(db,tx.id));
+  };
+  const txRows=(items:Transaction[])=>snapshot?items.map(tx=>{
+    const receipt=receipts.find(x=>x.transaction_id===tx.id);
+    return <View key={tx.id}><TransactionRow tx={tx} s={snapshot} c={c} lang={prefs.language} onEdit={editTx} onDelete={askDelete} onReceipt={receiptAction} receipt={receipt}/>
+      {receipt&&<TouchableOpacity accessibilityRole="imagebutton" onPress={()=>receiptAction(tx)} style={{paddingVertical:7}}><Image source={{uri:receipt.file_uri}} resizeMode="contain" style={{height:105,width:120,borderRadius:12,backgroundColor:c.surface}}/></TouchableOpacity>}
+    </View>;
+  }):null;
 
   const home=<>
     <View style={{backgroundColor:'#0e192a',padding:20,borderRadius:24,marginBottom:15}}>
@@ -234,6 +267,10 @@ export default function Tracker({account,onLock,onUpdateProfile,onChangePassword
       </View>
     </View>
     <FinancialChart c={c} currency={currency} data={chartData} lang={prefs.language}/>
+    <Panel c={c}><SectionHeader c={c}>{prefs.language==='my'?'ထပ်တိုး ငွေကြေးကိရိယာများ':'Financial Tools'}</SectionHeader>
+      <Label c={c} size={12} color={c.muted} style={{marginBottom:10}}>{prefs.language==='my'?'ပုံမှန်စာရင်း · ကဏ္ဍဘတ်ဂျက် · အကြွေး · ငွေစု':'Recurring · Category Budgets · Debts · Savings Goals'}</Label>
+      <Action c={c} tone="primary" label={prefs.language==='my'?'ကိရိယာများ ဖွင့်ရန် →':'Open Financial Tools →'} onPress={()=>setPage('features')}/>
+    </Panel>
     {prefs.show_wallets&&<Panel c={c}><SectionHeader c={c}>{t.wallets}</SectionHeader><View style={{flexDirection:'row',flexWrap:'wrap',gap:9}}>{wallets.map(w=>
       <View key={w.code} style={{width:'47%',flexGrow:1,padding:12,backgroundColor:c.surface,borderRadius:15}}><Label c={c} color={c.muted} size={11}>{w.name}</Label><MoneyTag value={walletBalance(snapshot!,w.code,currency)} currency={currency} c={c} color={walletBalance(snapshot!,w.code,currency)<0?c.red:c.green} size={14}/></View>
     )}</View></Panel>}
@@ -279,6 +316,9 @@ export default function Tracker({account,onLock,onUpdateProfile,onChangePassword
     <Panel c={c}><SectionHeader c={c}>{t.reports} · {currency}</SectionHeader><Label c={c} color={c.muted} size={12}>{t.reportRange}</Label>
       <View style={{flexDirection:'row',gap:8}}><View style={{flex:1}}><Field c={c} label={t.from} value={reportFrom} onChange={setReportFrom} maxLength={10}/></View><View style={{flex:1}}><Field c={c} label={t.to} value={reportTo} onChange={setReportTo} maxLength={10}/></View></View>
       <Action c={c} tone="soft" label={t.exportCsv} onPress={()=>void act(()=>exportCsv(snapshot!,reportItems,currency))}/>
+      <View style={{height:8}}/>
+      <Action c={c} tone="primary" label={prefs.language==='my'?'PDF အစီရင်ခံစာ ထုတ်ရန်':'Export PDF Statement'} onPress={()=>void act(()=>exportPdf(snapshot!,reportItems,currency,reportFrom,reportTo))}/>
+
       <View style={{flexDirection:'row',gap:7,marginTop:12}}>{[
         [t.income,reportTotals.income,c.green],[t.expense,reportTotals.expense,c.red],[t.net,reportTotals.net,c.text],
       ].map(([label,money,color])=><View key={label as string} style={{flex:1,padding:9,borderRadius:12,backgroundColor:c.surface}}><Label c={c} color={c.muted} size={10}>{label}</Label><MoneyTag value={money as number} currency={currency} c={c} size={13} color={color as string}/></View>)}</View>
@@ -296,6 +336,9 @@ export default function Tracker({account,onLock,onUpdateProfile,onChangePassword
   </>;
 
   const settings=<>
+    <Panel c={c}><SectionHeader c={c}>{prefs.language==='my'?'ငွေကြေးကိရိယာများ':'Financial Tools'}</SectionHeader>
+      <Action c={c} tone="primary" label={prefs.language==='my'?'Recurring / Budget / Debt / Goals':'Manage Recurring / Budgets / Debts / Goals'} onPress={()=>setPage('features')}/>
+    </Panel>
     <ReminderSettings db={db} lang={prefs.language} c={c}/>
     <ProfileSettings account={account} language={prefs.language} onLock={onLock} onUpdateProfile={onUpdateProfile} onChangePassword={onChangePassword} onRegenerateRecovery={onRegenerateRecovery} onBiometric={onBiometric}/>
     <Panel c={c}><SectionHeader c={c}>{t.settings}</SectionHeader>
@@ -304,6 +347,10 @@ export default function Tracker({account,onLock,onUpdateProfile,onChangePassword
       <Label c={c} size={11} color={c.muted} style={{marginTop:10,marginBottom:10}}>{t.independent}</Label>
       <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginBottom:10}}><Label c={c} weight="600">{t.dark}</Label><Switch value={prefs.dark_mode} trackColor={{true:c.accent,false:c.border}} onValueChange={v=>changePrefs({dark_mode:v})}/></View>
       <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center'}}><Label c={c} weight="600">{t.showWallets}</Label><Switch value={prefs.show_wallets} trackColor={{true:c.accent,false:c.border}} onValueChange={v=>changePrefs({show_wallets:v})}/></View>
+      <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginTop:12,gap:12}}>
+        <View style={{flex:1}}><Label c={c} weight="600">{prefs.language==='my'?'Home Widget မှာ လက်ကျန်ငွေပြ':'Show Balance on Home Widget'}</Label><Label c={c} size={10} color={c.muted}>{prefs.language==='my'?'ပုံမှန်အားဖြင့် မပြပါ (Private)':'Off by default to protect privacy'}</Label></View>
+        <Switch value={prefs.widget_show_balance===true} trackColor={{true:c.accent,false:c.border}} onValueChange={v=>changePrefs({widget_show_balance:v})}/>
+      </View>
     </Panel>
     <Panel c={c}><SectionHeader c={c}>{t.budget} · {currency}</SectionHeader>
       <Label c={c} weight="800" color={c.accent} size={19}>{formatMoney(budget,currency)}</Label>
@@ -326,20 +373,34 @@ export default function Tracker({account,onLock,onUpdateProfile,onChangePassword
       <Chips c={c} value={categoryKind} onChange={v=>setCategoryKind(v as CategoryKind)} options={[{value:'expense',label:t.expense},{value:'income',label:t.income},{value:'both',label:t.all}]}/><View style={{height:13}}/>
       <Action c={c} label={t.addCategory} onPress={()=>void act(async()=>{await addCategory(db,categoryEN,categoryMY,categoryKind);setCategoryEN('');setCategoryMY('');},true)}/>
     </Panel>
-    <Panel c={c}><SectionHeader c={c}>Backup & Restore</SectionHeader><Label c={c} color={c.muted} style={{marginBottom:14}} size={12}>{t.backupWarning}</Label>
-      <Action c={c} tone="primary" label={t.exportBackup} onPress={()=>void act(()=>exportBackup(snapshot!))}/><View style={{height:9}}/>
-      <Action c={c} label={t.restoreBackup} onPress={()=>void act(async()=>{
+    <Panel c={c}><SectionHeader c={c}>🔐 Encrypted Backup & Restore</SectionHeader>
+      <Label c={c} color={c.muted} size={12} style={{marginBottom:12}}>{prefs.language==='my'?'12 လုံးနှင့်အထက် Password သီးသန့်ထားပါ။ ဒီ Password မေ့သွားရင် Backup ကို ပြန်ဖွင့်လို့မရပါ။':'Choose a separate 12+ character backup password. Lost passwords cannot be recovered.'}</Label>
+      <TextInput value={backupPassword} onChangeText={setBackupPassword} secureTextEntry autoCapitalize="none" autoCorrect={false} placeholder={prefs.language==='my'?'Backup Password (12+ စာလုံး)':'Backup password (12+ chars)'} placeholderTextColor={c.muted} style={{color:c.text,backgroundColor:c.input,borderRadius:13,borderWidth:1,borderColor:c.border,padding:13,minHeight:50,marginBottom:12}}/>
+      <Action c={c} tone="primary" label={prefs.language==='my'?'🔐 Encrypted Backup ထုတ်':'🔐 Export Encrypted Backup'} onPress={()=>void act(async()=>{await encryptedExport(db,backupPassword);setBackupPassword('');})}/>
+      <View style={{height:9}}/>
+      <Action c={c} label={prefs.language==='my'?'Encrypted Backup ပြန်သွင်း':'Restore Encrypted Backup'} onPress={()=>{
+        if(backupPassword.length<12){Alert.alert('Backup','Enter the backup password (at least 12 characters)');return;}
+        Alert.alert('Replace All App Records?',prefs.language==='my'?'လက်ရှိငွေစာရင်းများကို Backup နဲ့ အစားထိုးမည်။ အရင် Backup ထုတ်ထားပါ။':'The current financial ledger and feature data will be replaced. Export your own backup first.',[
+          {text:t.cancel,style:'cancel'},
+          {text:t.confirm,style:'destructive',onPress:()=>void act(async()=>{await encryptedRestore(db,backupPassword);setBackupPassword('');setPage('home');Alert.alert('✓',t.restoreSuccess);})}
+        ]);
+      }}/>
+      <View style={{height:10}}/>
+      <Label c={c} color={c.muted} size={11} style={{marginBottom:8}}>{prefs.language==='my'?'Backup အဟောင်း JSON ဖိုင်များကိုလည်း Import လုပ်နိုင်သည် (Encrypted မဟုတ်ပါ)။':'Older unencrypted JSON backups can still be imported, with a confirmation.'}</Label>
+      <Action c={c} label={prefs.language==='my'?'Legacy JSON Import':'Import Legacy JSON'} onPress={()=>void act(async()=>{
         const raw=await selectBackup();if(raw===null)return;
-        Alert.alert('Backup Restore',t.restore,[{text:t.cancel,style:'cancel'},{text:t.confirm,style:'destructive',onPress:()=>void act(async()=>{await restoreBackup(db,raw);setPage('home');Alert.alert('✓',t.restoreSuccess);})}]);
-      })}/><View style={{height:11}}/>
+        Alert.alert('Legacy backup',t.restore,[{text:t.cancel,style:'cancel'},
+          {text:t.confirm,style:'destructive',onPress:()=>void act(async()=>{await restoreBackup(db,raw);setPage('home');Alert.alert('✓',t.restoreSuccess);})}]);
+      })}/>
+      <View style={{height:10}}/>
       <Action c={c} tone="danger" label={t.clear} onPress={()=>Alert.alert(t.clear,t.clearWarn,[{text:t.cancel,style:'cancel'},{text:t.delete,style:'destructive',onPress:()=>void act(()=>clearTransactions(db),true)}])}/>
     </Panel>
     <AboutPanel lang={prefs.language} c={c}/>
-    <Label c={c} color={c.muted} size={11} style={{textAlign:'center',marginBottom:10}}>Money Tracker v2.3 · TypeScript · Expo SQLite · Offline</Label>
+    <Label c={c} color={c.muted} size={11} style={{textAlign:'center',marginBottom:10}}>Money Tracker v2.5 · TypeScript · Expo SQLite · Offline</Label>
   </>;
 
   if(!snapshot)return <SafeAreaView style={{flex:1,backgroundColor:c.bg,alignItems:'center',justifyContent:'center'}}><ActivityIndicator color={c.accent}/></SafeAreaView>;
-  const screen=page==='home'?home:page==='add'?add:page==='history'?history:page==='reports'?reports:settings;
+  const screen=page==='features'?<FeatureHub db={db} snapshot={snapshot} lang={prefs.language} c={c} onChanged={refresh} onBack={()=>setPage('home')}/>:page==='home'?home:page==='add'?add:page==='history'?history:page==='reports'?reports:settings;
   // Short labels prevent clipped/overlapping Myanmar glyphs on small Android screens.
   const nav:{id:Page;label:string;fullLabel:string;icon:string}[]=[
     {id:'home',label:prefs.language==='my'?'ပင်မ':'Home',fullLabel:t.home,icon:'⌂'},

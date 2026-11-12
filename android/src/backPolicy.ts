@@ -1,5 +1,5 @@
-/** Pure Android Back-key rules, independently testable with Node. */
-export type MainPage = 'home' | 'add' | 'history' | 'reports' | 'settings';
+/** Pure Android Back-key rules, kept independently testable. */
+export type MainPage = 'home' | 'add' | 'history' | 'reports' | 'settings' | 'features';
 export type SessionScreen = 'loading' | 'register' | 'reveal' | 'login' | 'recovery' | 'open';
 
 export function mainBackAction(page: MainPage): 'goHome' | 'confirmExit' {

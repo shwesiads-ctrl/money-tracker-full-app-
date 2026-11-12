@@ -1,122 +1,45 @@
-# Money Tracker Android v2.4 — Back Key & Pull-to-Refresh
+# Money Tracker Android — v2.5.0
 
-- Android Back: on non-Home pages return to Home; on Home show an Exit confirmation with Cancel and OK. Only OK exits.
-- On login/registration show exit confirmation; Recovery Back returns to Login; Recovery Key reveal warns before exit.
-- Pull down on Dashboard, History, Reports and Settings to refresh the current local SQLite snapshot, updating totals, charts and lists without a network request or data mutation.
-- App version 2.4.0, Android versionCode 5; package ID and SQLite database name remain unchanged.
-- Back-navigation policy tests included; full Android device interaction QA still required. Back up valuable financial data before updating.
-
-# Money Tracker Android v2.3 — Reminders & About
-
-## What's new (v2.3)
-
-- Native on-device notifications, **opt-in** permission; daily transaction reminder and monthly report review reminder.
-- User-created one-time reminders with locally entered date/time and delete action.
-- Test notification button (about 10 seconds).
-- Private lock-screen notifications: no amounts, notes or custom reminder titles.
-- About Software page: Money Tracker 2.3.0; developer Myominaung (Myanmar), +959256060722, Telegram @kominit, email linkstar2012@gmail.com.
-- SQLite migration is additive; login/profile and financial transactions are preserved during APK update.
-- OS may delay delivery due to battery optimizations. Internet and cloud push are not needed.
-- **Backup limitation**: existing finance JSON exports do not include scheduled reminders or notification preferences; these remain in the local SQLite database until removed. Do not uninstall without backing up financial records.
-- Android 13+ asks for POST_NOTIFICATIONS at first opt-in.
-
-# Money Tracker Android — React Native + TypeScript
-
-Offline-first Myanmar/English money tracker for Android, using Expo SDK 58, React Native 0.88 and SQLite.
-
-## Status
-
-- Offline tests: **12/12 finance, 12/12 authentication, and 11/11 reminder-policy tests pass** (35/35).
-- Native Android APK compilation is checked by GitHub Actions. On-device reminder delivery, permission prompts and visual QA still require testing on an Android handset.
-- `.github/workflows/android-apk.yml` builds a **testing-only APK** in GitHub Actions after source is pushed, using a temporary testing signature (not a Play Store release).
-- **Not yet production ready**; review security, backups, UI, and real-device functionality before handling sensitive records.
+Android **React Native + TypeScript / Expo SDK 58**, offline-first with SQLite. Existing app ID `com.shwesiads.moneytracker` and SQLite database `money-tracker-ts.db` are preserved for in-place upgrades.
 
 ## Features
 
-- Dashboard: wallet balances, monthly income/expenses, monthly budget progress
-- Add/edit/delete transactions and wallet-to-wallet transfers
-- SQLite local database, no PHP hosting required for Android app
-- Full Myanmar/English UI, light/dark mode
-- Cash, KBZPay, WavePay, AYA Pay, CB Pay, Bank/Card, custom wallets/categories
-- Separate MMK and USD ledgers, *no automatic exchange-rate conversion*
-- Transaction search, filters, category and daily summaries, CSV export
-- Financial JSON backup & restore (supports compatible PHP v1.0 backups; reminder schedules are not included)
+- Previous v2.4 dashboard, transactions, wallets, category summaries, expense reports, 6-month chart, login/password recovery, fingerprint/face unlock, profile photo, reminders, Back exit confirmation, pull-to-refresh.
+- **Recurring transactions**: weekly or monthly income/expense templates. Posting **requires explicit user confirmation** and an overdue date. Unique occurrence rows prevent accidental double posting. Templates can be paused or removed without deleting posted ledger entries.
+- **Category budgets**: per-month, per-currency limits with 75% / 90% / 100% visual warnings and opt-in generic Android notifications. Budget alerts do not show amounts, descriptions or category titles on the lock screen.
+- **Debt & loan tracker**: money lent or borrowed, due date, partial repayments and remaining balance. These are informational: **they do not automatically change wallet balances**, to avoid double counting; record real transfers/expenses in Transactions separately.
+- **Savings goals**: target, contributions and progress. These are tracking entries only, not wallet transfers.
+- **Encrypted backup**: password-based PBKDF2-HMAC-SHA256 (210,000 iterations) and authenticated XChaCha20-Poly1305. Exports wallets, categories, transactions, budgets, preferences, feature records and receipt photos (size limits apply). Password is not stored; losing it makes the backup unrecoverable. Profile login credentials, device biometric keys and reminder schedules are **not** contained in the backup.
+- **Receipt attachments**: one photo per financial transaction, copied to private app storage. Preview/replace/remove from transaction list. This is not OCR or automatic transaction entry.
+- **PDF reports**: shareable PDF generated locally from the selected report date range/currency; CSV export retained.
+- **Android home screen widget**: summary with financial amounts **hidden by default**. Explicit Settings opt-in reveals the selected-currency balance on the device home screen.
 
-## Quick start
+## Data migration / backup safety
+
+The v2.5 migration adds tables using `CREATE TABLE IF NOT EXISTS` without changing existing financial records or the Android package ID. Update the installed app **without uninstalling**. First create an existing JSON backup from v2.4 if possible. This APK is a testing build and needs acceptance testing on a real Android device.
+
+Encrypted backups are **not** synonymous with an encrypted SQLite database. Existing local account security is unchanged: credentials stored via SecureStore, local financial SQLite remains unencrypted at rest by this app. Keep your Android device lock enabled.
+
+### Restore behavior
+
+Encrypted v2.5 restore replaces the financial ledger plus v2.5 feature tables after decryption and structural validation; receipt files are reconstructed. Old v2.2-v2.4 plaintext JSON backups can still be imported through the explicitly labeled legacy import action (they do not include new feature data). Please export your own backup **before restoring**.
+
+## Build / Test
 
 ```bash
 cd android
 npm install
 npm run test:core
 npm run typecheck
-npx expo start
-```
-
-To build an **installable testing APK** in GitHub, open **Actions → Build Money Tracker Android APK → Run workflow** (or push a change under `android/`). When build succeeds, open its run page, download **money-tracker-android-testing-apk** under Artifacts, extract the ZIP, and install the APK.
-
-**Important:** The testing APK is built with Expo's generated local debug/test signing configuration, not with a separately managed secure production signing key. Do **not** distribute it as a production or Play Store release. For release builds, manage your signing key securely and use an EAS Production profile / Android App Bundle as appropriate.
-
-A manual Expo cloud APK build is also supported:
-
-```bash
+npx expo prebuild --platform android --no-install
 cd android
-npm install
-npx eas-cli build -p android --profile preview
+./gradlew :app:assembleRelease
 ```
 
-This requires your **own** Expo account login/project initialization and may require setting up credentials. `eas.json` already requests APK output for preview.
+GitHub Actions creates a **private prerelease** when compilation succeeds; inspect `.github/workflows/android-apk.yml`. The APK uses a testing signature, not a Google Play distribution signature. The Expo Widgets implementation requires a native build (not Expo Go).
 
-## Project layout
+**Status:** Core/feature pure tests pass locally. GitHub Actions and real-device end-to-end validation are required before production use. Dependencies could not be installed in the sandbox due to network limitations.
 
-- `android/App.tsx` — app provider
-- `android/src/Tracker.tsx` — React Native screens and UI
-- `android/src/core.ts` — pure TypeScript financial logic and backup validation
-- `android/src/database.ts` — SQLite schema and transaction CRUD
-- `android/src/export.ts` — Android share and JSON file import/export
-- `android/src/i18n.ts` — Myanmar/English translations
-- `android/tests/core.test.ts` — financial core tests
-- `.github/workflows/android-apk.yml` — GitHub Actions testing APK build
+## Developer
 
-## Privacy and data
-
-All normal financial records remain in the phone's local SQLite database; no online account or server synchronization is implemented. JSON backup and CSV export are **unencrypted**: keep exported copies private. Backup restore replaces the current dataset after validation; make a backup first. This is a personal finance tracker, not regulated accounting software.
-
-## Financial model
-
-Each currency has its own ledger and wallet opening balance. Transfers between wallets do not count as income/expenses. Budget applies to expense entries in the current calendar month for the selected currency.
-
-## Verification
-
-```bash
-cd android
-npm run test:core    # 10 tests
-npm run typecheck    # requires npm packages installed
-```
-
-No Android APK was generated inside the sandbox: no Android SDK + npm network access were available. The GitHub Actions workflow has to run to produce the first verified APK.
-
-## v2.1 UI & branding improvements
-- Fixed 5-tab Android navigation: compact one-line Myanmar/English labels, larger touch areas, central Add action and accessible tab names.
-- New native Android app icon, adaptive launcher icon and Expo splash screen (SDK 58 plugin).
-- Dashboard includes live income-versus-expense proportion and a tappable six-month grouped bar chart using actual SQLite transaction records, with no fabricated amounts.
-- No changes to database identity (`money-tracker-ts.db`) or Android package ID; user data remains stored locally.
-- **Signing warning:** CI testing APKs may use different ephemeral signing keys. If Android refuses to update an existing installation, export a JSON backup from the current version *before* uninstalling it, then restore after installing the new APK.
-
-## v2.3 — Local full-profile login & Android UX fixes
-
-- First launch registration with username, display name, 10+ character password, and one-time **160-bit recovery key** (store offline).
-- Local login with PBKDF2-HMAC-SHA256 (120,000 iterations, per-secret random salt), secure device keystore storage, and persistent failed-attempt backoff.
-- Password reset with recovery key; a successful reset turns off biometrics until explicitly re-enabled.
-- Optional fingerprint/face sign-in via a device-authenticated SecureStore token. Requires enrolled device biometrics; password login remains available when biometric keys become invalid.
-- Editable display name, locally stored profile picture, change password, regenerate recovery key and lock/logout.
-- Lock when the app has been backgrounded for over 60 seconds or left idle for five minutes (app-level timeout).
-- Bottom navigation uses fixed-height icon/label slots and extra Android gesture-area padding to prevent Myanmar-script label collisions.
-- Preserves Android package `com.shwesiads.moneytracker` and SQLite name `money-tracker-ts.db` from v2.1.
-
-### Security limitations (read before using)
-
-The account is **single-device and offline**, not an online/remote account. It has no cloud sync, remote account recovery or multi-user separation; a future backend would be a separate project phase. Authentication gates the app UI but **does not encrypt the SQLite database itself**. For sensitive financial data, use phone encryption and a secure screen lock, and keep any JSON export/backup in encrypted storage. The recovery key is never emailed, stored in plain text or recoverable after dismissal; do not lose it. If both password and recovery key are lost, there is no guaranteed way to regain access without resetting app data. You should make a private JSON backup **before** installing a new build. Android APK updates require a matching signing certificate; never uninstall before backing up.
-
-### QA
-
-`npm run test:core` runs 12 finance and 12 auth validation cases. Full native Android biometric, profile picker, secure storage and SQLite upgrade tests require installation on a real device; passing CI alone is not a substitute.
+Myominaung (Myanmar) · +959256060722 · Telegram [@kominit](https://t.me/kominit) · linkstar2012@gmail.com

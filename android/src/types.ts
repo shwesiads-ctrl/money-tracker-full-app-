@@ -32,7 +32,7 @@ export interface Transaction {
   created_at: string;
 }
 export interface Budget { currency: Currency; amount_minor: number; }
-export interface AppPrefs { language: Language; currency: Currency; dark_mode: boolean; show_wallets: boolean; }
+export interface AppPrefs { language: Language; currency: Currency; dark_mode: boolean; show_wallets: boolean; widget_show_balance?: boolean; }
 export interface Snapshot { wallets: Wallet[]; categories: Category[]; transactions: Transaction[]; budgets: Budget[]; settings: AppPrefs; }
 export interface BackupV2 extends Snapshot { format: 'money-tracker-ts-backup'; version: 2; exported_at: string; }
 export interface TransactionInput { id?: string; type: TransactionType; date: string; currency: Currency; amount_minor: number; description: string; wallet_code: string; to_wallet_code: string | null; category_code: string | null; }

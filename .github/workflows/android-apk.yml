@@ -48,8 +48,7 @@ jobs:
       - name: Build standalone APK (temporary testing signature)
         working-directory: android/android
         run: chmod +x ./gradlew && ./gradlew :app:assembleRelease --no-daemon
-      # GitHub Actions artifact quota is exhausted; releases use separate storage.
-      # Repository is PRIVATE: release assets require an authorized GitHub account.
+      # The previous Actions artifact upload hit the repository storage quota.
       - name: Publish APK as private prerelease asset
         env:
           GH_TOKEN: ${{ github.token }}
@@ -57,13 +56,13 @@ jobs:
           set -euo pipefail
           apk="$(find android/android/app/build/outputs/apk/release -maxdepth 1 -name '*.apk' -type f | head -1)"
           test -s "$apk"
-          cp "$apk" Money_Tracker_Android_v2.4.apk
-          if gh release view v2.4.0 >/dev/null 2>&1; then
-            gh release upload v2.4.0 Money_Tracker_Android_v2.4.apk --clobber
+          cp "$apk" Money_Tracker_Android_v2.5.apk
+          if gh release view v2.5.0 >/dev/null 2>&1; then
+            gh release upload v2.5.0 Money_Tracker_Android_v2.5.apk --clobber
           else
-            gh release create v2.4.0 Money_Tracker_Android_v2.4.apk \
+            gh release create v2.5.0 Money_Tracker_Android_v2.5.apk \
               --target "$GITHUB_SHA" \
-              --title "Money Tracker Android v2.4.0 (Testing APK)" \
-              --notes "Android Back-key OK/Cancel exit confirmation and local SQLite pull-to-refresh. Testing only; back up financial data before updating." \
+              --title "Money Tracker Android v2.5.0 (Testing APK)" \
+              --notes "Money Tracker Android v2.5 with recurring transactions, category budgets, debt/loan tracking, savings goals, encrypted backups, receipt photos, PDF reports and opt-in home widget. Testing only; back up finances before updating." \
               --prerelease
           fi
