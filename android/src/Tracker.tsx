@@ -294,7 +294,7 @@ export default function Tracker({account,onLock,onUpdateProfile,onChangePassword
             <Label c={c} size={11} weight="700" color="#ffffff">{prefs.language==='my'?({day:'နေ့',week:'ပတ်',month:'လ',year:'နှစ်'} as const)[period]:({day:'Day',week:'Week',month:'Month',year:'Year'} as const)[period]}</Label>
           </TouchableOpacity>)}
         </View>
-      </View>
+      </View>}
       <View style={{marginTop:16}}><View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginBottom:7}}>
         <Label c={c} color="#b5c6d6" size={11}>{t.budget}</Label><Label c={c} color={budgetPercent>=100?'#fb7185':'#4ade80'} size={11} weight="700">{budget>0?`${budgetPercent}%`:'—'} · {formatMoney(budget,currency)}</Label></View>
         <Bar c={c} pct={budgetPercent} color={budgetPercent>=100?'#f43f5e':budgetPercent>=75?'#fbbf24':'#10b981'}/>
