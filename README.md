@@ -1,4 +1,4 @@
-# Money Tracker Android — v2.5.0
+# Money Tracker Android — v2.5.2
 
 Android **React Native + TypeScript / Expo SDK 58**, offline-first with SQLite. Existing app ID `com.shwesiads.moneytracker` and SQLite database `money-tracker-ts.db` are preserved for in-place upgrades.
 
@@ -43,3 +43,11 @@ GitHub Actions creates a **private prerelease** when compilation succeeds; inspe
 ## Developer
 
 Myominaung (Myanmar) · +959256060722 · Telegram [@kominit](https://t.me/kominit) · linkstar2012@gmail.com
+
+## v2.5.2 Widget UI
+
+- Dark navy opaque background, rounded card, green title, white balance and no cluttered helper text.
+- Two Android widgets: Compact 2x2 and Balance 4x2 (monthly income/expense).
+- Both hide amounts by default and obey Settings > Show Balance on Home Widget.
+- Existing SQLite, finance, fingerprint, login, backup and Back-key behavior preserved. Version code 8.
+- After update, remove and re-add the widget from the launcher. Physical device visual QA is required.

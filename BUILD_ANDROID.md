@@ -21,3 +21,9 @@ GitHub Actions publishes a prerelease asset at https://github.com/shwesiads-ctrl
 - Check back confirmation, pull-to-refresh, notification delivery, device biometric unlock on real phones.
 
 Phone / biometric / notification and widget runtime tests have not been performed in the sandbox; please report any screen or device-specific issues.
+
+## v2.5.2 widget acceptance
+
+- Add Compact (2x2) and Balance (4x2) widgets from Android launcher; verify dark background and readable layout.
+- With Show Balance on Home Widget off, both widgets must conceal amounts. Enable to reveal balance; medium shows current month's income and expense.
+- Test high font scale and long amounts on a real device. The CI build alone cannot verify visual rendering.

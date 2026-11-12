@@ -1,11 +1,11 @@
 import {Platform} from 'react-native';
 import MoneyWidget from './MoneyWidget';
+import MoneyWidgetSmall from './MoneyWidgetSmall';
 import type {Snapshot,Currency} from './types';
-import {formatMoney,walletBalance} from './core';
-/** On-device widget. No credentials or transaction notes are ever exposed. */
+import {widgetDisplayModel} from './widgetModel';
 export function updateMoneyWidget(snapshot:Snapshot,currency:Currency){
  if(Platform.OS!=='android')return;
- const show=snapshot.settings.widget_show_balance===true;
- const balance=snapshot.wallets.reduce((sum,w)=>sum+walletBalance(snapshot,w.code,currency),0);
- try {MoneyWidget.updateSnapshot({headline:show?formatMoney(balance,currency):'Your money stays private',summary:show?`${currency} balance · tap for details`:'Open app to view dashboard'});}catch{}
+ const data=widgetDisplayModel(snapshot,currency);
+ try{MoneyWidget.updateSnapshot(data);}catch(e){if(__DEV__)console.warn('Medium widget update failed',e);}
+ try{MoneyWidgetSmall.updateSnapshot({amount:data.amount,currency:data.currency,isPrivate:data.isPrivate});}catch(e){if(__DEV__)console.warn('Compact widget update failed',e);}
 }

@@ -4,6 +4,7 @@ import { SQLiteProvider } from 'expo-sqlite';
 import { initDatabase } from './src/database';
 // Register widget before user signs in.
 import './src/MoneyWidget';
+import './src/MoneyWidgetSmall';
 import SecureSession from './src/SecureSession';
 
 export default function App() {

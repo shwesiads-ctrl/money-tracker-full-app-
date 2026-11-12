@@ -23,6 +23,8 @@
     "../src/backPolicy.ts",
     "./backPolicy.test.ts",
     "../src/featurePolicy.ts",
-    "./featurePolicy.test.ts"
+    "./featurePolicy.test.ts",
+    "../src/widgetModel.ts",
+    "./widgetModel.test.ts"
   ]
 }
