@@ -22,7 +22,7 @@ const strings=(d:unknown)=>typeof d==='object'&&d!==null?d as Record<string,unkn
 function sessionSecret(data:unknown){
  const d=strings(data);const sessionId=d.sessionId,secret=d.secret;
  if(typeof sessionId!=='string'||!SESSION.test(sessionId)||typeof secret!=='string'||!SECRET.test(secret))bad('Invalid pairing credentials');
- return {sessionId,secret};
+ return {sessionId:sessionId as string,secret:secret as string};
 }
 const checkExpire=(x:{expiresAt?:Timestamp})=>{
  if(!x.expiresAt||x.expiresAt.toMillis()<Date.now())throw new HttpsError('deadline-exceeded','Pairing expired. Request another QR.');
@@ -66,7 +66,7 @@ export const approvePair=onCall(opt,async req=>{
  if(!req.auth?.uid||req.auth.token.email_verified!==true)throw new HttpsError('unauthenticated','Sign in with a verified email before approving QR login.');
  const data=strings(req.data),sessionId=data.sessionId,code=data.code;
  if(typeof sessionId!=='string'||!SESSION.test(sessionId)||typeof code!=='string'||!CODE.test(code))bad('Invalid QR code');
- const ref=db.collection('pairSessions').doc(sessionId);
+ const ref=db.collection('pairSessions').doc(sessionId as string);
  await db.runTransaction(async tx=>{
   const snap=await tx.get(ref);if(!snap.exists)throw new HttpsError('not-found','Session not found');
   const row=snap.data()!;checkExpire(row);
