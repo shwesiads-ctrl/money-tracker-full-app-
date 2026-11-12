@@ -15,6 +15,10 @@ import AboutPanel from './AboutPanel';
 import CloudSyncPanel from './CloudSyncPanel';
 import { mainBackAction } from './backPolicy';
 import { confirmExit } from './exitDialog';
+import {analyticsRange,shiftAnalyticsAnchor,analyticsBuckets} from './analytics';
+import type {AnalyticsPeriod} from './analytics';
+import {backDestination} from './settingsNavigation';
+import type {SettingsSection} from './settingsNavigation';
 import FeatureHub from './FeatureHub';
 import {readFeatures} from './featureDb';
 import type {Receipt} from './featureDb';
@@ -129,6 +133,9 @@ export default function Tracker({account,onLock,onUpdateProfile,onChangePassword
   const db=useSQLiteContext();
   const [snapshot,setSnapshot]=useState<Snapshot|null>(null);
   const [page,setPage]=useState<Page>('home');
+  const [settingsSection,setSettingsSection]=useState<SettingsSection|null>(null);
+  const [analyticsPeriod,setAnalyticsPeriod]=useState<AnalyticsPeriod>('month');
+  const [analyticsAnchor,setAnalyticsAnchor]=useState(dateToday);
   const [busy,setBusy]=useState(false);
   const [refreshing,setRefreshing]=useState(false);
   const [receipts,setReceipts]=useState<Receipt[]>([]);
@@ -184,7 +191,9 @@ export default function Tracker({account,onLock,onUpdateProfile,onChangePassword
   const budget=snapshot?.budgets.find(b=>b.currency===currency)?.amount_minor||0;
   const budgetPercent=budget>0?Math.round(monthTotal.expense*100/budget):0;
   const historyItems=useMemo(()=>filterTransactions(currencyTx,{currency,search,type:historyType,wallet:historyWallet,from:historyFrom,to:historyTo}),[currencyTx,currency,search,historyType,historyWallet,historyFrom,historyTo]);
-  const reportItems=useMemo(()=>filterTransactions(currencyTx,{currency,from:reportFrom,to:reportTo}),[currencyTx,currency,reportFrom,reportTo]);
+  const periodRange=useMemo(()=>analyticsPeriod==='custom'?{from:reportFrom,to:reportTo}:analyticsRange(analyticsPeriod,analyticsAnchor),[analyticsPeriod,analyticsAnchor,reportFrom,reportTo]);
+  const reportItems=useMemo(()=>filterTransactions(currencyTx,{currency,from:periodRange.from,to:periodRange.to}),[currencyTx,currency,periodRange.from,periodRange.to]);
+  const trend=useMemo(()=>analyticsPeriod==='custom'?[]:analyticsBuckets(currencyTx,analyticsPeriod,analyticsAnchor),[currencyTx,analyticsPeriod,analyticsAnchor]);
   const reportTotals=totals(reportItems);
   const categoryReport=categoryTotals(reportItems);
   const dailyReport=dailyTotals(reportItems);
@@ -218,19 +227,24 @@ export default function Tracker({account,onLock,onUpdateProfile,onChangePassword
     setEditingId(null);setPage('home');setForm(formDefault());
   },true);
   const updateType=(next:Mode)=>{setForm(f=>({...f,type:next,category:categories.find(x=>x.active===1&&(x.kind===next||x.kind==='both'))?.code||'Other'}));};
+  // Native hardware Back and the in-app Back control share one route.
+  // Disable predictive Back callbacks in app.json until this React Native version handles them reliably.
+  const onAndroidBack=useCallback(()=>{
+    if(backDestination(page,settingsSection)==='settingsMenu')setSettingsSection(null);
+    else if(page==='features'){setPage('settings');setSettingsSection(null);}
+    else if(mainBackAction(page)==='confirmExit')confirmExit(prefs.language);
+  },[page,settingsSection,prefs.language]);
   useEffect(()=>{
     if(Platform.OS!=='android')return;
-    const listener=BackHandler.addEventListener('hardwareBackPress',()=>{
-      if(mainBackAction(page)==='confirmExit') confirmExit(prefs.language);
-      return true; // prevents Android from closing without an explicit OK
-    });
-    return ()=>listener.remove();
-  },[page,prefs.language]);
+    const sub=BackHandler.addEventListener('hardwareBackPress',()=>{onAndroidBack();return true;});
+    return ()=>sub.remove();
+  },[onAndroidBack]);
   const selectedOpening=wallets.find(w=>w.code===openingEdit);
   const openBalance=(code:string)=>{const w=wallets.find(x=>x.code===code);if(!w)return;setOpeningEdit(code);setOpeningText(fromMinor(currency==='MMK'?w.opening_mmk_minor:w.opening_usd_minor,currency));};
 
   const header=<View style={{paddingHorizontal:15,paddingTop:11,paddingBottom:12,flexDirection:'row',alignItems:'center',justifyContent:'space-between',borderColor:c.border,borderBottomWidth:1,backgroundColor:c.panel}}>
-    <TouchableOpacity accessibilityLabel="Open Profile" onPress={()=>setPage('settings')}><Image source={account.avatarUri?{uri:account.avatarUri}:require('../assets/icon.png')} style={{width:42,height:42,borderRadius:21,marginRight:10}}/></TouchableOpacity>
+    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Back or Exit" onPress={onAndroidBack} style={{paddingRight:12,paddingVertical:6}}><Text style={{fontSize:23,color:c.accent}}>‹</Text></TouchableOpacity>
+    <TouchableOpacity accessibilityLabel="Open Profile" onPress={()=>{setSettingsSection('profile');setPage('settings');}}><Image source={account.avatarUri?{uri:account.avatarUri}:require('../assets/icon.png')} style={{width:42,height:42,borderRadius:21,marginRight:10}}/></TouchableOpacity>
     <View style={{flex:1,minWidth:0}}><Label c={c} size={10} lines={1} weight="700" color={c.accent}>{t.welcome}</Label><Label c={c} size={19} weight="800">{t.title}</Label></View>
     <View style={{gap:5,alignItems:'flex-end'}}><TouchableOpacity onPress={()=>changePrefs({language:prefs.language==='en'?'my':'en'})}><Label c={c} color={c.accent} weight="800" size={12}>{prefs.language==='my'?'မြန်မာ ▾':'EN ▾'}</Label></TouchableOpacity>
     <TouchableOpacity onPress={()=>selectCurrency(currency==='MMK'?'USD':'MMK')}><Label c={c} size={12} weight="800" color={c.muted}>{currency==='MMK'?'Ks ⇄ USD':'USD ⇄ Ks'}</Label></TouchableOpacity></View>
@@ -313,16 +327,43 @@ export default function Tracker({account,onLock,onUpdateProfile,onChangePassword
   </>;
 
   const reports=<>
-    <Panel c={c}><SectionHeader c={c}>{t.reports} · {currency}</SectionHeader><Label c={c} color={c.muted} size={12}>{t.reportRange}</Label>
-      <View style={{flexDirection:'row',gap:8}}><View style={{flex:1}}><Field c={c} label={t.from} value={reportFrom} onChange={setReportFrom} maxLength={10}/></View><View style={{flex:1}}><Field c={c} label={t.to} value={reportTo} onChange={setReportTo} maxLength={10}/></View></View>
+    <Panel c={c}><SectionHeader c={c}>{prefs.language==='my'?'ငွေစာရင်း ခွဲခြမ်းစိတ်ဖြာ':'Financial Analysis'} · {currency}</SectionHeader>
+      <Chips c={c} value={analyticsPeriod} onChange={v=>setAnalyticsPeriod(v as AnalyticsPeriod)} options={[
+        {value:'day',label:prefs.language==='my'?'နေ့':'Day'},
+        {value:'week',label:prefs.language==='my'?'ပတ်':'Week'},
+        {value:'month',label:prefs.language==='my'?'လ':'Month'},
+        {value:'year',label:prefs.language==='my'?'နှစ်':'Year'},
+        {value:'custom',label:prefs.language==='my'?'စိတ်ကြိုက်':'Custom'},
+      ]}/>
+      {analyticsPeriod==='custom'?<View style={{flexDirection:'row',gap:8,marginTop:9}}><View style={{flex:1}}><Field c={c} label={t.from} value={reportFrom} onChange={setReportFrom} maxLength={10}/></View><View style={{flex:1}}><Field c={c} label={t.to} value={reportTo} onChange={setReportTo} maxLength={10}/></View></View>:
+      <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginVertical:12,gap:6}}>
+        <Action c={c} small label="◀" onPress={()=>setAnalyticsAnchor(a=>shiftAnalyticsAnchor(analyticsPeriod,a,-1))}/>
+        <View style={{flex:1,alignItems:'center'}}><Label c={c} size={12} weight="700">{periodRange.from===periodRange.to?periodRange.from:`${periodRange.from} — ${periodRange.to}`}</Label></View>
+        <Action c={c} small label="▶" onPress={()=>setAnalyticsAnchor(a=>shiftAnalyticsAnchor(analyticsPeriod,a,1))}/>
+        <Action c={c} small tone="soft" label={prefs.language==='my'?'ယနေ့':'Today'} onPress={()=>setAnalyticsAnchor(dateToday())}/>
+      </View>}
+      <View style={{height:6}}/>
       <Action c={c} tone="soft" label={t.exportCsv} onPress={()=>void act(()=>exportCsv(snapshot!,reportItems,currency))}/>
       <View style={{height:8}}/>
-      <Action c={c} tone="primary" label={prefs.language==='my'?'PDF အစီရင်ခံစာ ထုတ်ရန်':'Export PDF Statement'} onPress={()=>void act(()=>exportPdf(snapshot!,reportItems,currency,reportFrom,reportTo))}/>
-
+      <Action c={c} tone="primary" label={prefs.language==='my'?'PDF အစီရင်ခံစာ ထုတ်ရန်':'Export PDF Statement'} onPress={()=>void act(()=>exportPdf(snapshot!,reportItems,currency,periodRange.from,periodRange.to))}/>
       <View style={{flexDirection:'row',gap:7,marginTop:12}}>{[
         [t.income,reportTotals.income,c.green],[t.expense,reportTotals.expense,c.red],[t.net,reportTotals.net,c.text],
       ].map(([label,money,color])=><View key={label as string} style={{flex:1,padding:9,borderRadius:12,backgroundColor:c.surface}}><Label c={c} color={c.muted} size={10}>{label}</Label><MoneyTag value={money as number} currency={currency} c={c} size={13} color={color as string}/></View>)}</View>
     </Panel>
+    {analyticsPeriod!=='custom'&&<Panel c={c}>
+      <SectionHeader c={c}>{prefs.language==='my'?'ကာလအလိုက် ဝင်ငွေ/ထွက်ငွေ':'Income / Expenses Trend'}</SectionHeader>
+      <View style={{flexDirection:'row',justifyContent:'space-between',marginBottom:12}}><Label c={c} size={11} color={c.green}>● {t.income}</Label><Label c={c} size={11} color={c.red}>● {t.expense}</Label></View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{gap:7,paddingBottom:7}}>
+        {trend.map((bucket)=>{const max=Math.max(1,...trend.map(x=>Math.max(x.income,x.expense)));return <View key={bucket.key} style={{width:analyticsPeriod==='year'?39:analyticsPeriod==='week'?43:analyticsPeriod==='day'?92:51,alignItems:'center'}}>
+          <View style={{height:126,flexDirection:'row',alignItems:'flex-end',gap:3}}>
+            <View style={{width:13,height:bucket.income?Math.max(4,Math.round(bucket.income*112/max)):2,borderRadius:4,backgroundColor:c.green}}/>
+            <View style={{width:13,height:bucket.expense?Math.max(4,Math.round(bucket.expense*112/max)):2,borderRadius:4,backgroundColor:c.red}}/>
+          </View>
+          <Label c={c} size={10} color={c.muted} lines={1}>{bucket.label}</Label>
+        </View>})}
+      </ScrollView>
+      {trend.every(x=>x.income===0&&x.expense===0)&&<Label c={c} color={c.muted} size={12}>{t.empty}</Label>}
+    </Panel>}
     <Panel c={c}><SectionHeader c={c}>{t.categories}</SectionHeader>{categoryReport.length?categoryReport.map(x=>{
       const cat=categories.find(z=>z.code===x.category);
       const share=reportTotals.expense>0?x.amount_minor*100/reportTotals.expense:0;
@@ -336,12 +377,32 @@ export default function Tracker({account,onLock,onUpdateProfile,onChangePassword
   </>;
 
   const settings=<>
-    <Panel c={c}><SectionHeader c={c}>{prefs.language==='my'?'ငွေကြေးကိရိယာများ':'Financial Tools'}</SectionHeader>
-      <Action c={c} tone="primary" label={prefs.language==='my'?'Recurring / Budget / Debt / Goals':'Manage Recurring / Budgets / Debts / Goals'} onPress={()=>setPage('features')}/>
-    </Panel>
+    {settingsSection===null?<Panel c={c}>
+      <SectionHeader c={c}>{prefs.language==='my'?'ဆက်တင်များ':'Settings'}</SectionHeader>
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Appearance & Language" key="appearance" onPress={()=>setSettingsSection('appearance')} style={{paddingVertical:15,borderBottomWidth:StyleSheet.hairlineWidth,borderColor:c.border,flexDirection:'row',alignItems:'center',gap:12}}><Label c={c} size={20}>{'🎨'}</Label><View style={{flex:1}}><Label c={c} weight="700">{prefs.language==='my'?'အသွင်အပြင်နှင့် ဘာသာစကား':'Appearance & Language'}</Label></View><Label c={c} color={c.muted} size={20}>›</Label></TouchableOpacity>
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Profile & Security" key="profile" onPress={()=>setSettingsSection('profile')} style={{paddingVertical:15,borderBottomWidth:StyleSheet.hairlineWidth,borderColor:c.border,flexDirection:'row',alignItems:'center',gap:12}}><Label c={c} size={20}>{'👤'}</Label><View style={{flex:1}}><Label c={c} weight="700">{prefs.language==='my'?'ပရိုဖိုင်နှင့် လုံခြုံရေး':'Profile & Security'}</Label></View><Label c={c} color={c.muted} size={20}>›</Label></TouchableOpacity>
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Wallets" key="wallets" onPress={()=>setSettingsSection('wallets')} style={{paddingVertical:15,borderBottomWidth:StyleSheet.hairlineWidth,borderColor:c.border,flexDirection:'row',alignItems:'center',gap:12}}><Label c={c} size={20}>{'💳'}</Label><View style={{flex:1}}><Label c={c} weight="700">{prefs.language==='my'?'ငွေစာရင်းအိတ်များ':'Wallets'}</Label></View><Label c={c} color={c.muted} size={20}>›</Label></TouchableOpacity>
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Categories" key="categories" onPress={()=>setSettingsSection('categories')} style={{paddingVertical:15,borderBottomWidth:StyleSheet.hairlineWidth,borderColor:c.border,flexDirection:'row',alignItems:'center',gap:12}}><Label c={c} size={20}>{'🗂'}</Label><View style={{flex:1}}><Label c={c} weight="700">{prefs.language==='my'?'အမျိုးအစားများ':'Categories'}</Label></View><Label c={c} color={c.muted} size={20}>›</Label></TouchableOpacity>
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Monthly Budget" key="budget" onPress={()=>setSettingsSection('budget')} style={{paddingVertical:15,borderBottomWidth:StyleSheet.hairlineWidth,borderColor:c.border,flexDirection:'row',alignItems:'center',gap:12}}><Label c={c} size={20}>{'📊'}</Label><View style={{flex:1}}><Label c={c} weight="700">{prefs.language==='my'?'လစဉ်ဘတ်ဂျက်':'Monthly Budget'}</Label></View><Label c={c} color={c.muted} size={20}>›</Label></TouchableOpacity>
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Notifications & Reminders" key="reminders" onPress={()=>setSettingsSection('reminders')} style={{paddingVertical:15,borderBottomWidth:StyleSheet.hairlineWidth,borderColor:c.border,flexDirection:'row',alignItems:'center',gap:12}}><Label c={c} size={20}>{'🔔'}</Label><View style={{flex:1}}><Label c={c} weight="700">{prefs.language==='my'?'သတိပေးချက်များ':'Notifications & Reminders'}</Label></View><Label c={c} color={c.muted} size={20}>›</Label></TouchableOpacity>
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Backup & Restore" key="backup" onPress={()=>setSettingsSection('backup')} style={{paddingVertical:15,borderBottomWidth:StyleSheet.hairlineWidth,borderColor:c.border,flexDirection:'row',alignItems:'center',gap:12}}><Label c={c} size={20}>{'🔐'}</Label><View style={{flex:1}}><Label c={c} weight="700">{prefs.language==='my'?'Backup နှင့် Restore':'Backup & Restore'}</Label></View><Label c={c} color={c.muted} size={20}>›</Label></TouchableOpacity>
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Cloud Sync & QR" key="cloud" onPress={()=>setSettingsSection('cloud')} style={{paddingVertical:15,borderBottomWidth:StyleSheet.hairlineWidth,borderColor:c.border,flexDirection:'row',alignItems:'center',gap:12}}><Label c={c} size={20}>{'☁'}</Label><View style={{flex:1}}><Label c={c} weight="700">{prefs.language==='my'?'Cloud Sync နှင့် QR':'Cloud Sync & QR'}</Label></View><Label c={c} color={c.muted} size={20}>›</Label></TouchableOpacity>
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel="About Software" key="about" onPress={()=>setSettingsSection('about')} style={{paddingVertical:15,borderBottomWidth:StyleSheet.hairlineWidth,borderColor:c.border,flexDirection:'row',alignItems:'center',gap:12}}><Label c={c} size={20}>{'ℹ'}</Label><View style={{flex:1}}><Label c={c} weight="700">{prefs.language==='my'?'ဆော့ဖ်ဝဲအကြောင်း':'About Software'}</Label></View><Label c={c} color={c.muted} size={20}>›</Label></TouchableOpacity>
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Financial Tools" onPress={()=>setPage('features')} style={{paddingVertical:15,borderBottomWidth:StyleSheet.hairlineWidth,borderColor:c.border,flexDirection:'row',alignItems:'center',gap:12}}><Label c={c} size={20}>◈</Label><View style={{flex:1}}><Label c={c} weight="700">{prefs.language==='my'?'ငွေကြေးကိရိယာများ':'Financial Tools'}</Label></View><Label c={c} color={c.muted} size={20}>›</Label></TouchableOpacity>
+      <View style={{height:14}}/>
+      <Action c={c} label={prefs.language==='my'?'အက်ပ်မှ ထွက်ရန်':'Exit App'} onPress={()=>confirmExit(prefs.language)}/>
+    </Panel>:<>
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Back to Settings" onPress={()=>setSettingsSection(null)} style={{flexDirection:'row',alignItems:'center',gap:10,padding:12,backgroundColor:c.panel,borderRadius:16,marginBottom:14}}><Label c={c} color={c.accent} size={23}>‹</Label><Label c={c} weight="700">{prefs.language==='my'?'ဆက်တင်သို့ ပြန်သွား':'Back to Settings'}</Label></TouchableOpacity>
+      {settingsSection==='cloud'&&<>
     <CloudSyncPanel onChanged={refresh}/>
+      </>}
+      {settingsSection==='reminders'&&<>
     <ReminderSettings db={db} lang={prefs.language} c={c}/>
+      </>}
+      {settingsSection==='profile'&&<>
     <ProfileSettings account={account} language={prefs.language} onLock={onLock} onUpdateProfile={onUpdateProfile} onChangePassword={onChangePassword} onRegenerateRecovery={onRegenerateRecovery} onBiometric={onBiometric}/>
+      </>}
+      {settingsSection==='appearance'&&<>
     <Panel c={c}><SectionHeader c={c}>{t.settings}</SectionHeader>
       <Label c={c} color={c.muted} size={12} style={{marginBottom:7}}>{t.language}</Label><Chips c={c} value={prefs.language} onChange={v=>changePrefs({language:v as 'en'|'my'})} options={[{value:'my',label:'မြန်မာ'},{value:'en',label:'English'}]}/>
       <View style={{height:13}}/><Label c={c} color={c.muted} size={12}>{t.currency}</Label><Chips c={c} value={currency} onChange={v=>selectCurrency(v as Currency)} options={[{value:'MMK',label:'Myanmar Kyat (Ks)'},{value:'USD',label:'US Dollar ($)'}]}/>
@@ -353,11 +414,15 @@ export default function Tracker({account,onLock,onUpdateProfile,onChangePassword
         <Switch value={prefs.widget_show_balance===true} trackColor={{true:c.accent,false:c.border}} onValueChange={v=>changePrefs({widget_show_balance:v})}/>
       </View>
     </Panel>
+      </>}
+      {settingsSection==='budget'&&<>
     <Panel c={c}><SectionHeader c={c}>{t.budget} · {currency}</SectionHeader>
       <Label c={c} weight="800" color={c.accent} size={19}>{formatMoney(budget,currency)}</Label>
       <Field c={c} label={t.amount} value={budgetText} onChange={setBudgetText} placeholder={fromMinor(budget,currency)} keyboard="decimal-pad" maxLength={16}/>
       <Action c={c} tone="primary" label={t.saveBudget} onPress={()=>void act(async()=>{await setBudget(db,currency,toMinor(budgetText||fromMinor(budget,currency),currency,true));setBudgetText('');},true)}/>
     </Panel>
+      </>}
+      {settingsSection==='wallets'&&<>
     <Panel c={c}><SectionHeader c={c}>{t.wallets}</SectionHeader>
       {wallets.map(w=><View key={w.code} style={{borderBottomWidth:StyleSheet.hairlineWidth,borderColor:c.border,paddingVertical:8}}><View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:10}}>
         <View style={{flex:1}}><Label c={c} weight="700">{w.name}</Label><Label c={c} color={c.muted} size={11}>{t.opening}: {formatMoney(currency==='MMK'?w.opening_mmk_minor:w.opening_usd_minor,currency)}</Label></View>
@@ -368,12 +433,16 @@ export default function Tracker({account,onLock,onUpdateProfile,onChangePassword
       </View>)}
       <View style={{height:13}}/><Field c={c} label={t.newWallet} value={walletName} onChange={setWalletName} maxLength={60}/><Action c={c} label={t.addWallet} onPress={()=>void act(async()=>{await addWallet(db,walletName);setWalletName('');},true)}/>
     </Panel>
+      </>}
+      {settingsSection==='categories'&&<>
     <Panel c={c}><SectionHeader c={c}>{t.category}</SectionHeader>
       {categories.map(cat=><View key={cat.code} style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginBottom:7}}><View style={{flex:1}}><Label c={c} weight="600" size={12}>{prefs.language==='my'?cat.name_my:cat.name_en}</Label><Label c={c} color={c.muted} size={10}>{cat.kind}</Label></View><Switch value={Boolean(cat.active)} trackColor={{true:c.accent,false:c.border}} onValueChange={v=>void act(()=>setCategoryActive(db,cat.code,v))}/></View>)}
       <View style={{height:10}}/><Field c={c} label={t.newCategoryEN} value={categoryEN} onChange={setCategoryEN} maxLength={60}/><Field c={c} label={t.newCategoryMY} value={categoryMY} onChange={setCategoryMY} maxLength={60}/>
       <Chips c={c} value={categoryKind} onChange={v=>setCategoryKind(v as CategoryKind)} options={[{value:'expense',label:t.expense},{value:'income',label:t.income},{value:'both',label:t.all}]}/><View style={{height:13}}/>
       <Action c={c} label={t.addCategory} onPress={()=>void act(async()=>{await addCategory(db,categoryEN,categoryMY,categoryKind);setCategoryEN('');setCategoryMY('');},true)}/>
     </Panel>
+      </>}
+      {settingsSection==='backup'&&<>
     <Panel c={c}><SectionHeader c={c}>🔐 Encrypted Backup & Restore</SectionHeader>
       <Label c={c} color={c.muted} size={12} style={{marginBottom:12}}>{prefs.language==='my'?'12 လုံးနှင့်အထက် Password သီးသန့်ထားပါ။ ဒီ Password မေ့သွားရင် Backup ကို ပြန်ဖွင့်လို့မရပါ။':'Choose a separate 12+ character backup password. Lost passwords cannot be recovered.'}</Label>
       <TextInput value={backupPassword} onChangeText={setBackupPassword} secureTextEntry autoCapitalize="none" autoCorrect={false} placeholder={prefs.language==='my'?'Backup Password (12+ စာလုံး)':'Backup password (12+ chars)'} placeholderTextColor={c.muted} style={{color:c.text,backgroundColor:c.input,borderRadius:13,borderWidth:1,borderColor:c.border,padding:13,minHeight:50,marginBottom:12}}/>
@@ -396,11 +465,15 @@ export default function Tracker({account,onLock,onUpdateProfile,onChangePassword
       <View style={{height:10}}/>
       <Action c={c} tone="danger" label={t.clear} onPress={()=>Alert.alert(t.clear,t.clearWarn,[{text:t.cancel,style:'cancel'},{text:t.delete,style:'destructive',onPress:()=>void act(()=>clearTransactions(db),true)}])}/>
     </Panel>
+      </>}
+      {settingsSection==='about'&&<>
     <AboutPanel lang={prefs.language} c={c}/>
+      </>}
+    </>}
   </>;
 
   if(!snapshot)return <SafeAreaView style={{flex:1,backgroundColor:c.bg,alignItems:'center',justifyContent:'center'}}><ActivityIndicator color={c.accent}/></SafeAreaView>;
-  const screen=page==='features'?<FeatureHub db={db} snapshot={snapshot} lang={prefs.language} c={c} onChanged={refresh} onBack={()=>setPage('home')}/>:page==='home'?home:page==='add'?add:page==='history'?history:page==='reports'?reports:settings;
+  const screen=page==='features'?<FeatureHub db={db} snapshot={snapshot} lang={prefs.language} c={c} onChanged={refresh} onBack={()=>{setPage('settings');setSettingsSection(null);}}/>:page==='home'?home:page==='add'?add:page==='history'?history:page==='reports'?reports:settings;
   // Short labels prevent clipped/overlapping Myanmar glyphs on small Android screens.
   const nav:{id:Page;label:string;fullLabel:string;icon:string}[]=[
     {id:'home',label:prefs.language==='my'?'ပင်မ':'Home',fullLabel:t.home,icon:'⌂'},
@@ -413,7 +486,7 @@ export default function Tracker({account,onLock,onUpdateProfile,onChangePassword
     <StatusBar style={prefs.dark_mode?'light':'dark'}/>
     {header}
     <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==='ios'?'padding':undefined}>
-      <ScrollView key={page} keyboardShouldPersistTaps="handled" style={{flex:1}}
+      <ScrollView key={`${page}-${settingsSection??'menu'}`} keyboardShouldPersistTaps="handled" style={{flex:1}}
         refreshControl={page==='add'?undefined:<RefreshControl refreshing={refreshing} onRefresh={()=>void onPullToRefresh()} colors={[c.accent]} tintColor={c.accent} progressBackgroundColor={c.panel} />}
         contentContainerStyle={{paddingHorizontal:15,paddingTop:16,paddingBottom:34}}>{screen}</ScrollView>
     </KeyboardAvoidingView>
@@ -422,7 +495,7 @@ export default function Tracker({account,onLock,onUpdateProfile,onChangePassword
         {nav.map(n=>{
           const active=page===n.id;
           const addButton=n.id==='add';
-          return <TouchableOpacity key={n.id} accessibilityRole="tab" accessibilityLabel={n.fullLabel} accessibilityState={{selected:active}} activeOpacity={0.8} onPress={()=>addButton?goToAdd():setPage(n.id)} style={{flex:1,minWidth:0,height:80,alignItems:'center',justifyContent:'flex-start',paddingTop:5,borderRadius:14,backgroundColor:active&&!addButton?c.accentSoft:'transparent'}}>
+          return <TouchableOpacity key={n.id} accessibilityRole="tab" accessibilityLabel={n.fullLabel} accessibilityState={{selected:active}} activeOpacity={0.8} onPress={()=>{if(addButton)goToAdd();else{if(n.id==='settings')setSettingsSection(null);setPage(n.id);}}} style={{flex:1,minWidth:0,height:80,alignItems:'center',justifyContent:'flex-start',paddingTop:5,borderRadius:14,backgroundColor:active&&!addButton?c.accentSoft:'transparent'}}>
             <View style={{height:38,alignItems:'center',justifyContent:'center'}}>
               <View style={{width:addButton?42:34,height:addButton?42:34,borderRadius:addButton?21:10,backgroundColor:addButton?c.accent:'transparent',alignItems:'center',justifyContent:'center'}}>
                 <Text allowFontScaling={false} style={{fontSize:addButton?27:25,lineHeight:addButton?33:31,fontWeight:'800',color:addButton?'#ffffff':active?c.accent:c.muted,textAlign:'center',textAlignVertical:'center'}}>{n.icon}</Text>

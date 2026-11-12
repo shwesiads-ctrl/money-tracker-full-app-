@@ -25,6 +25,10 @@
     "../src/featurePolicy.ts",
     "./featurePolicy.test.ts",
     "../src/widgetModel.ts",
-    "./widgetModel.test.ts"
+    "./widgetModel.test.ts",
+    "../src/analytics.ts",
+    "./analytics.test.ts",
+    "../src/settingsNavigation.ts",
+    "./settingsNavigation.test.ts"
   ]
 }

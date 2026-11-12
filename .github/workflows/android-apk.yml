@@ -90,13 +90,13 @@ jobs:
           set -euo pipefail
           apk="$(find android/android/app/build/outputs/apk/release -maxdepth 1 -name '*.apk' -type f | head -1)"
           test -s "$apk"
-          cp "$apk" Money_Tracker_Android_v2.6.1_Cloud_Preview.apk
-          if gh release view v2.6.1-cloud-preview >/dev/null 2>&1; then
-            gh release upload v2.6.1-cloud-preview Money_Tracker_Android_v2.6.1_Cloud_Preview.apk --clobber
+          cp "$apk" Money_Tracker_Android_v2.6.2_Analytics_Settings.apk
+          if gh release view v2.6.2-android-analytics >/dev/null 2>&1; then
+            gh release upload v2.6.2-android-analytics Money_Tracker_Android_v2.6.2_Analytics_Settings.apk --clobber
           else
-            gh release create v2.6.1-cloud-preview Money_Tracker_Android_v2.6.1_Cloud_Preview.apk \
+            gh release create v2.6.2-android-analytics Money_Tracker_Android_v2.6.2_Analytics_Settings.apk \
               --target "$GITHUB_SHA" \
-              --title "Money Tracker Android v2.6.1 Cloud Preview (Testing APK)" \
-              --notes "Money Tracker v2.6.1-cloud-preview Widget UI redesign: dark card, compact 2x2 and medium 4x2 widget, balance typography, monthly income/expenses and privacy-first defaults. Keep data backups. Physical Android launcher QA pending." \
+              --title "Money Tracker Android v2.6.2 Analytics + Settings (Testing APK)" \
+              --notes "Money Tracker Android v2.6.2: Day/Week/Month/Year analytics, separate settings pages, Back key compatibility mode with OK/Cancel exit. Local SQLite and Cloud code preserved. Back up data before updating." \
               --prerelease
           fi
