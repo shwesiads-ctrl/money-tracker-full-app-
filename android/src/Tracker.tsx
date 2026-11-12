@@ -220,8 +220,7 @@ export default function Tracker({account,onLock,onUpdateProfile,onChangePassword
   useEffect(()=>{
     if(Platform.OS!=='android')return;
     const listener=BackHandler.addEventListener('hardwareBackPress',()=>{
-      if(mainBackAction(page)==='goHome')setPage('home');
-      else confirmExit(prefs.language);
+      if(mainBackAction(page)==='confirmExit') confirmExit(prefs.language);
       return true; // prevents Android from closing without an explicit OK
     });
     return ()=>listener.remove();
@@ -396,7 +395,6 @@ export default function Tracker({account,onLock,onUpdateProfile,onChangePassword
       <Action c={c} tone="danger" label={t.clear} onPress={()=>Alert.alert(t.clear,t.clearWarn,[{text:t.cancel,style:'cancel'},{text:t.delete,style:'destructive',onPress:()=>void act(()=>clearTransactions(db),true)}])}/>
     </Panel>
     <AboutPanel lang={prefs.language} c={c}/>
-    <Label c={c} color={c.muted} size={11} style={{textAlign:'center',marginBottom:10}}>Money Tracker v2.5 · TypeScript · Expo SQLite · Offline</Label>
   </>;
 
   if(!snapshot)return <SafeAreaView style={{flex:1,backgroundColor:c.bg,alignItems:'center',justifyContent:'center'}}><ActivityIndicator color={c.accent}/></SafeAreaView>;

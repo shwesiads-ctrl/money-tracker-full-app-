@@ -62,7 +62,6 @@ export default function SecureSession(){
           {!!error&&<Text selectable style={{color:'#fb7185',fontSize:12,lineHeight:22,marginTop:12}}>{error}</Text>}
         </>}
       </View>
-      <Txt muted>Offline • Secure local sign-in • Android</Txt>
     </ScrollView>
   </View>;
 }

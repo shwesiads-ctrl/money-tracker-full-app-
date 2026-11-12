@@ -2,7 +2,7 @@ import React from 'react';
 import {Alert,Image,Linking,Text,TouchableOpacity,View} from 'react-native';
 
 type Colors={panel:string;surface:string;border:string;text:string;muted:string;accent:string};
-const VERSION='2.5.0';
+const VERSION='2.5.1';
 const PHONE='+959256060722';
 const TELEGRAM='https://t.me/kominit';
 const EMAIL='linkstar2012@gmail.com';

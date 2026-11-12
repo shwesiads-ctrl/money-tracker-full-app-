@@ -2,8 +2,9 @@
 export type MainPage = 'home' | 'add' | 'history' | 'reports' | 'settings' | 'features';
 export type SessionScreen = 'loading' | 'register' | 'reveal' | 'login' | 'recovery' | 'open';
 
-export function mainBackAction(page: MainPage): 'goHome' | 'confirmExit' {
-  return page === 'home' ? 'confirmExit' : 'goHome';
+export function mainBackAction(_page: MainPage): 'confirmExit' {
+  // Show exit confirmation on every main tab.
+  return 'confirmExit';
 }
 
 export function sessionBackAction(screen: SessionScreen): 'goLogin' | 'confirmExit' | 'ignore' {

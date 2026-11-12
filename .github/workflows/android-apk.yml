@@ -45,6 +45,21 @@ jobs:
       - name: Expo prebuild
         working-directory: android
         run: npx expo prebuild --platform android --no-install
+      - name: Verify native widget receiver after prebuild
+        working-directory: android
+        run: |
+          set -euo pipefail
+          manifest=android/app/src/main/AndroidManifest.xml
+          test -f "$manifest"
+          grep -q 'android.appwidget.action.APPWIDGET_UPDATE' "$manifest"
+          grep -q 'android.appwidget.provider' "$manifest"
+          echo "PASS: Android native widget receiver registered"
+      - name: Verify text cleanup
+        working-directory: android
+        run: |
+          set -euo pipefail
+          ! grep -Fq 'Money Tracker v2.5 · TypeScript · Expo SQLite · Offline' src/Tracker.tsx
+          ! grep -Fq 'Offline • Secure local sign-in • Android' src/SecureSession.tsx
       - name: Build standalone APK (temporary testing signature)
         working-directory: android/android
         run: chmod +x ./gradlew && ./gradlew :app:assembleRelease --no-daemon
@@ -56,13 +71,13 @@ jobs:
           set -euo pipefail
           apk="$(find android/android/app/build/outputs/apk/release -maxdepth 1 -name '*.apk' -type f | head -1)"
           test -s "$apk"
-          cp "$apk" Money_Tracker_Android_v2.5.apk
-          if gh release view v2.5.0 >/dev/null 2>&1; then
-            gh release upload v2.5.0 Money_Tracker_Android_v2.5.apk --clobber
+          cp "$apk" Money_Tracker_Android_v2.5.1.apk
+          if gh release view v2.5.1 >/dev/null 2>&1; then
+            gh release upload v2.5.1 Money_Tracker_Android_v2.5.1.apk --clobber
           else
-            gh release create v2.5.0 Money_Tracker_Android_v2.5.apk \
+            gh release create v2.5.1 Money_Tracker_Android_v2.5.1.apk \
               --target "$GITHUB_SHA" \
-              --title "Money Tracker Android v2.5.0 (Testing APK)" \
-              --notes "Money Tracker Android v2.5 with recurring transactions, category budgets, debt/loan tracking, savings goals, encrypted backups, receipt photos, PDF reports and opt-in home widget. Testing only; back up finances before updating." \
+              --title "Money Tracker Android v2.5.1 (Testing APK)" \
+              --notes "Money Tracker Android v2.5.1 testing APK: widget initial layout, receiver verification, all-tab Back OK/Cancel confirmation, unwanted footer removal. Device QA pending; back up finance data first." \
               --prerelease
           fi
