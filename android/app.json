@@ -55,8 +55,7 @@
                 "minWidth": 180,
                 "minHeight": 110,
                 "targetCellWidth": 4,
-                "targetCellHeight": 2,
-                "initialLayout": "./src/MoneyWidget.tsx"
+                "targetCellHeight": 2
               }
             }
           ]

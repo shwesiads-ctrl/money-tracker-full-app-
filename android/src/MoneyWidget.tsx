@@ -1,4 +1,3 @@
-import React from 'react';
 import {Column,Text} from '@expo/ui/jetpack-compose';
 import {createWidget} from 'expo-widgets';
 const MoneyWidget=({headline,summary}:{headline:string;summary:string})=>{
