@@ -10,7 +10,7 @@ export function assertAmount(value:number, allowZero=false){
 export function nextDue(date:string,frequency:Frequency):string{
  if(!isValidDate(date))throw new Error('Invalid due date');
  if(frequency!=='weekly'&&frequency!=='monthly')throw new Error('Invalid repeat frequency');
- const [y,m,d]=date.split('-').map(Number);
+ const [y,m,d]=date.split('-').map(Number) as [number,number,number];
  const day=new Date(Date.UTC(y,m-1,d));
  if(frequency==='weekly')day.setUTCDate(day.getUTCDate()+7);
  else {const monthFirst=new Date(Date.UTC(y,m,1));const last=new Date(Date.UTC(monthFirst.getUTCFullYear(),monthFirst.getUTCMonth()+1,0)).getUTCDate();day.setTime(Date.UTC(monthFirst.getUTCFullYear(),monthFirst.getUTCMonth(),Math.min(d,last)));}
