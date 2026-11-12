@@ -41,7 +41,7 @@ jobs:
         run: |
           $exe = Get-ChildItem 'windows/src-tauri/target/release/bundle/nsis/*-setup.exe' | Select-Object -First 1
           if (!$exe) { throw 'NSIS .exe not found' }
-          Copy-Item $exe.FullName Money_Tracker_Windows_v0.1.0_Setup.exe
-          gh release view windows-v0.1.0 > $null 2>&1
-          if ($LASTEXITCODE -eq 0) { gh release upload windows-v0.1.0 Money_Tracker_Windows_v0.1.0_Setup.exe --clobber }
-          else { gh release create windows-v0.1.0 Money_Tracker_Windows_v0.1.0_Setup.exe --target $env:GITHUB_SHA --title 'Money Tracker Windows v0.1.0 (Firebase QR Preview)' --notes 'Windows Tauri installer foundation. Firebase project config and Cloud Functions deployment required for live pairing and sync. No embedded secrets; testing only.' --prerelease }
+          Copy-Item $exe.FullName Money_Tracker_Windows_v0.2.0_Setup.exe
+          gh release view windows-v0.2.0-spark > $null 2>&1
+          if ($LASTEXITCODE -eq 0) { gh release upload windows-v0.2.0-spark Money_Tracker_Windows_v0.2.0_Setup.exe --clobber }
+          else { gh release create windows-v0.2.0-spark Money_Tracker_Windows_v0.2.0_Setup.exe --target $env:GITHUB_SHA --title 'Money Tracker Windows v0.2.0 (Firebase Spark JSON Preview)' --notes 'Windows Tauri installer foundation. Firebase Spark project configuration and Firestore rules required. No Cloud Functions or Blaze. Windows email login plus Android QR approval. No embedded secrets; testing only.' --prerelease }

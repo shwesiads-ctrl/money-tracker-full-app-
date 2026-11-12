@@ -7,5 +7,4 @@ export const cloudConfig={
  authDomain:'',
  projectId:'',
  appId:'',
- functionsRegion:'asia-southeast1',
 };

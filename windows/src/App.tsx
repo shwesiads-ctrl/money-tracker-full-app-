@@ -1,5 +1,5 @@
 import React,{useEffect,useMemo,useRef,useState} from 'react';
-import {onAuthStateChanged,type User} from 'firebase/auth';
+import {onAuthStateChanged,signInWithEmailAndPassword,sendPasswordResetEmail,reload,getIdToken,type User} from 'firebase/auth';
 import {QRCodeSVG} from 'qrcode.react';
 import {LayoutDashboard,ArrowLeftRight,Wallet,ChartNoAxesCombined,Settings2,ShieldCheck,RefreshCw,LogOut,Smartphone,Cloud,PlusCircle,AlertCircle,CheckCircle2,ArrowUpRight,ArrowDownRight,ScanLine} from 'lucide-react';
 import {auth,firebaseConfigured} from './firebase';
@@ -19,36 +19,50 @@ const tabs:{id:Tab;name:string;my:string;icon:React.ReactNode}[]=[
  {id:'reports',name:'Reports',my:'အစီရင်ခံစာ',icon:<ChartNoAxesCombined {...iconProps}/>},
  {id:'settings',name:'Settings',my:'ဆက်တင်',icon:<Settings2 {...iconProps}/>}
 ];
-function LoginView(){
- const [session,setSession]=useState<PairSession|null>(null),[msg,setMsg]=useState('Click Generate QR to authorize this computer.'),[loading,setLoading]=useState(false);
+function LoginView({user,onApproved}:{user:User|null;onApproved:()=>void}){
+ const [email,setEmail]=useState(''),[password,setPassword]=useState(''),[verified,setVerified]=useState(Boolean(user?.emailVerified));
+ const [session,setSession]=useState<PairSession|null>(null),[msg,setMsg]=useState('Sign in with the same Firebase account used on Android.'),[loading,setLoading]=useState(false);
  const [seconds,setSeconds]=useState(0);const completing=useRef(false);
- const generate=async()=>{setLoading(true);completing.current=false;setSession(null);setMsg('Creating a secure pairing session…');try{const s=await startPair();setSession(s);setMsg('Scan this code using the Money Tracker Android app.');}catch(e){setMsg(String(e));}finally{setLoading(false);}};
- useEffect(()=>{if(!firebaseConfigured)return;void generate();},[]);
+ const login=async()=>{if(!auth)return;setLoading(true);setMsg('Signing in…');try{await signInWithEmailAndPassword(auth,email.trim(),password);setPassword('');setMsg('Firebase account verified. Now approve this Windows device with Android.');}catch(e){setMsg(String(e));}finally{setLoading(false);}};
+ const reset=async()=>{if(!auth||!email.trim()){setMsg('Enter your account email first.');return;}try{await sendPasswordResetEmail(auth,email.trim());setMsg('If this email has an account, check for a password reset email.');}catch(e){setMsg(String(e));}};
+ const recheck=async()=>{if(!user)return;setLoading(true);try{await reload(user);await getIdToken(user,true);setVerified(user.emailVerified);setMsg(user.emailVerified?'Verified. Generate your QR.':'Please verify the email, then try again.');}catch(e){setMsg(String(e));}finally{setLoading(false);}};
+ const generate=async()=>{setLoading(true);completing.current=false;setSession(null);setMsg('Creating device approval request…');try{const request=await startPair();setSession(request);setMsg('Scan with Money Tracker on Android (same Firebase email), then Approve.');}catch(e){setMsg(String(e));}finally{setLoading(false);}};
+ useEffect(()=>{setVerified(Boolean(user?.emailVerified));setSession(null);completing.current=false;},[user?.uid]);
+ useEffect(()=>{if(!user||!verified||session)return;void generate();},[user?.uid,verified]);
  useEffect(()=>{if(!session)return;let closed=false;const timer=setInterval(()=>{
   const remaining=Math.max(0,Math.ceil((session.expiresAt-Date.now())/1000));setSeconds(remaining);
-  if(remaining<=0){setMsg('Pairing code expired. Generate another one.');return;}
+  if(remaining<=0){setMsg('Pairing expired. Generate a new QR.');return;}
   if(closed||completing.current)return;
   void (async()=>{try{const status=await checkPair(session);
-   if(status==='approved'&&!completing.current){completing.current=true;setMsg('Approved — signing in securely…');await completePair(session);}
-   else if(status==='expired'||status==='used')setMsg('Pairing code expired or used. Generate a new one.');
-  }catch(e){if(!closed){completing.current=false;setMsg('Cannot verify pairing: '+String(e));}}})();
- },2500);return()=>{closed=true;clearInterval(timer);};},[session]);
- return <div className="login-center"><div className="login-card"><div className="brandmark">▥</div><h1>Money Tracker</h1><p className="my-title">Windows အက်ပ် — QR Login</p>
-  {!firebaseConfigured?<div className="notice warn"><AlertCircle size={17}/> Firebase Project မချိတ်ဆက်ရသေးပါ။ Windows <code>.env</code> မှာ Firebase Web Configuration ထည့်ပြီး App ပြန် Build လုပ်ပါ။</div>:<>
+   if(status==='approved'&&!completing.current){completing.current=true;setMsg('Device approved! Opening dashboard…');await completePair(session);if(!closed)onApproved();}
+   else if(status==='expired'||status==='used')setMsg('Pairing expired or already used. Generate a new QR.');
+  }catch(e){if(!closed){completing.current=false;setMsg('Cannot verify approval: '+String(e));}}})();
+ },2500);return()=>{closed=true;clearInterval(timer);};},[session,onApproved]);
+ return <div className="login-center"><div className="login-card"><div className="brandmark">▥</div><h1>Money Tracker</h1><p className="my-title">Windows • Free Firebase Spark + JSON Sync</p>
+  {!firebaseConfigured?<div className="notice warn"><AlertCircle size={17}/> Add Firebase Web Config to Windows <code>.env</code> and rebuild. No Cloud Functions or Blaze required.</div>: !user? <>
+   <p className="helper">Use the same Firebase Email/Password account as your Android phone. QR approval comes next.</p>
+   <input className="login-input" type="email" placeholder="Firebase Email" value={email} autoComplete="username" onChange={e=>setEmail(e.target.value)}/>
+   <input className="login-input" type="password" placeholder="Firebase Password" value={password} autoComplete="current-password" onChange={e=>setPassword(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')void login();}}/>
+   <button className="primary" disabled={loading||!email||!password} onClick={()=>void login()}>Sign In to Firebase</button>
+   <button className="secondary-login" onClick={()=>void reset()}>Forgot Password?</button>
+   </>:!verified?<><div className="notice warn">Email verification is required for private Firestore data and device approval.</div><button className="primary" disabled={loading} onClick={()=>void recheck()}>Refresh Email Verification</button><button className="secondary-login" onClick={()=>void logOut()}>Sign Out</button></>:<>
    <div className="qr-wrap">{session&&seconds>0?<QRCodeSVG value={pairQr(session)} size={220} marginSize={1} bgColor="#ffffff" fgColor="#051525"/>:<ScanLine size={100} color="#417b76"/>}</div>
    <div className="pair-code">{session&&seconds>0?session.code:'------'}</div><div className="muted">Verification code • Expires in {seconds}s</div>
-   <p className="helper">{msg}</p><button className="primary" disabled={loading} onClick={()=>void generate()}><RefreshCw size={16}/> {loading?'Loading…':'Generate New QR'}</button>
-   <p className="muted tiny">Android: Cloud Sync → Scan Windows QR → Verify code → Approve.<br/>QR does not contain a password or authentication token.</p>
-  </>}</div></div>;
+   <p className="helper">{msg}</p><button className="primary" disabled={loading} onClick={()=>void generate()}><RefreshCw size={16}/>{loading?'Loading…':'Generate New QR'}</button>
+   <button className="secondary-login" onClick={()=>void logOut()}>Use Another Account / Sign Out</button>
+   <p className="muted tiny">Android: Cloud Sync → Scan Windows Device QR → Compare code → Approve.<br/>QR is device confirmation only; it contains NO account password/token.</p>
+   </>}
+  <p className="helper" role="status">{!user?msg:''}</p>
+ </div></div>;
 }
 function BalanceCard({label,value,kind}:{label:string;value:string;kind:'balance'|'income'|'expense'}){return <div className={`stat ${kind}`}><div className="stat-label">{label}</div><strong>{value}</strong><span className="stat-hint">{kind==='balance'?'Across all wallets':kind==='income'?'This month':'This month'}</span></div>;}
 function App(){
- const [user,setUser]=useState<User|null>(null),[ready,setReady]=useState(false),[tab,setTab]=useState<Tab>('dashboard');
+ const [user,setUser]=useState<User|null>(null),[ready,setReady]=useState(false),[paired,setPaired]=useState(false),[tab,setTab]=useState<Tab>('dashboard');
  const [currency,setCurrency]=useState<Currency>('MMK'),[cloud,setCloud]=useState<CloudEnvelope|null>(null);
  const [syncError,setSyncError]=useState(''),[showAdd,setShowAdd]=useState(false);
  const [draft,setDraft]=useState<{date:string;type:TransactionType;currency:Currency;amount:string;description:string;wallet:string;toWallet:string;category:string}>({date:dateNow(),type:'expense',currency:'MMK',amount:'',description:'',wallet:'Cash',toWallet:'KBZPay',category:'Food'});
  const [busy,setBusy]=useState(false);const data:FinancePayload|undefined=cloud?.payload;
- useEffect(()=>{if(!auth){setReady(true);return;}return onAuthStateChanged(auth,u=>{setUser(u);setReady(true);if(!u)setCloud(null);});},[]);
+ useEffect(()=>{if(!auth){setReady(true);return;}return onAuthStateChanged(auth,u=>{setUser(old=>{if(old?.uid!==u?.uid)setPaired(false);return u;});setReady(true);if(!u)setCloud(null);});},[]);
  useEffect(()=>{if(!user){setCloud(null);return;}return subscribeCloud(user.uid,r=>{setCloud(r);setSyncError('');},e=>setSyncError(e.message));},[user?.uid]);
  const sum=useMemo(()=>data?computeDashboard(data,currency,monthNow()):null,[data,currency]);
  const recent=useMemo(()=>data?[...data.transactions].filter(x=>x.currency===currency).sort((a,b)=>b.date.localeCompare(a.date)||b.created_at.localeCompare(a.created_at)).slice(0,50):[],[data,currency]);
@@ -59,10 +73,10 @@ function App(){
   setShowAdd(false);setDraft(s=>({...s,amount:'',description:''}));
  }catch(e){setSyncError(String(e));}finally{setBusy(false);}}
  if(!ready)return <div className="loading">Money Tracker…</div>;
- if(!user)return <LoginView/>;
+ if(!user||!paired)return <LoginView user={user} onApproved={()=>setPaired(true)}/>;
  return <div className="layout"><aside className="sidebar"><div className="logo"><div className="logo-badge">▥</div><div><b>Money Tracker</b><small>WINDOWS DESKTOP</small></div></div>
   <div className="side-label">MENU</div><nav>{tabs.map(x=><button key={x.id} className={'nav-btn '+(tab===x.id?'active':'')} onClick={()=>setTab(x.id)}>{x.icon}<span>{x.name}<small>{x.my}</small></span></button>)}</nav>
-  <div className="side-bottom"><div className="online"><span className="online-dot"/> Firebase connected</div><div className="muted tiny">Secure QR sign-in • Sync v1</div><button className="logout" onClick={()=>void logOut()}><LogOut size={16}/> Sign out</button></div>
+  <div className="side-bottom"><div className="online"><span className="online-dot"/> Firebase connected</div><div className="muted tiny">Firebase password + QR device approval • Sync v1</div><button className="logout" onClick={()=>void logOut()}><LogOut size={16}/> Sign out</button></div>
  </aside><main className="main"><header className="header"><div><div className="eyebrow">Money Tracker • မိမိငွေကြေးကို စီမံခန့်ခွဲပါ</div><h1>{tabs.find(x=>x.id===tab)?.name}</h1></div><div className="header-right"><span className="verified"><Cloud size={16}/> Firebase</span><button className="currency" onClick={()=>setCurrency(c=>c==='MMK'?'USD':'MMK')}>{currency} ⇄</button><button className="avatar" title={user.email||'Cloud user'}>{user.email?.[0]?.toUpperCase()||'U'}</button></div></header>
   {syncError&&<div className="notice warn"><AlertCircle size={17}/> {syncError}<button className="close" onClick={()=>setSyncError('')}>×</button></div>}
   {!data?<div className="empty-state"><Cloud size={44}/><h2>No cloud financial data yet</h2><p>Open Money Tracker on Android → Cloud Sync → <b>Upload local data</b> to link the existing SQLite ledger. This Windows app does not create demo finances.</p><p className="muted">Firebase UID: {user.uid.slice(0,8)}…</p></div>:<>

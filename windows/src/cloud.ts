@@ -1,31 +1,43 @@
-import {signInWithCustomToken,signOut} from 'firebase/auth';
-import {doc,onSnapshot,runTransaction,serverTimestamp,type Unsubscribe} from 'firebase/firestore';
-import {httpsCallable} from 'firebase/functions';
-import {auth,db,functions} from './firebase';
+import {signOut} from 'firebase/auth';
+import {doc,onSnapshot,runTransaction,serverTimestamp,Timestamp,setDoc,getDoc,deleteDoc,type Unsubscribe} from 'firebase/firestore';
+import {auth,db} from './firebase';
 import type {CloudEnvelope,FinancePayload,Currency,TransactionType} from './domain';
 import {isFinancePayload} from './domain';
 
-function assertOnline(){if(!auth||!db||!functions)throw Error('Firebase configuration missing. Set VITE_FIREBASE_* and rebuild Windows app.');return {auth,db,functions};}
+function assertOnline(){if(!auth||!db)throw Error('Firebase configuration missing. Set VITE_FIREBASE_* and rebuild Windows app.');return {auth,db};}
 const bytesHex=(input:Uint8Array)=>Array.from(input,b=>b.toString(16).padStart(2,'0')).join('');
-export async function newSecret(){const bytes=new Uint8Array(32);crypto.getRandomValues(bytes);const secret=bytesHex(bytes);return {secret,secretHash:bytesHex(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(secret))))};}
-export type PairSession={sessionId:string;code:string;expiresAt:number;secret:string};
+export type PairSession={sessionId:string;code:string;expiresAt:number;uid:string};
+/** Spark plan: Firebase password sign-in happens BEFORE QR. QR only confirms the same-UID device. */
 export async function startPair():Promise<PairSession>{
- const {functions}=assertOnline();const {secret,secretHash}=await newSecret();
- const callable=httpsCallable<{secretHash:string;deviceName:string},{sessionId:string;code:string;expiresAt:number}>(functions,'startPair');
- const response=await callable({secretHash,deviceName:'Money Tracker Windows'});
- if(!/^[A-Za-z0-9_-]{24,80}$/.test(response.data.sessionId))throw Error('Invalid pairing session from server');
- return {...response.data,secret};
+ const {auth,db}=assertOnline();const user=auth.currentUser;
+ if(!user||!user.emailVerified)throw Error('Sign in and verify your Firebase email before pairing.');
+ const bytes=new Uint8Array(24);crypto.getRandomValues(bytes);
+ const sessionId=bytesHex(bytes),code=String(100000+Math.floor(crypto.getRandomValues(new Uint32Array(1))[0]!/4294967296*900000));
+ const expiresAt=Date.now()+120000;
+ await setDoc(doc(db,'users',user.uid,'pairs',sessionId),{
+  schema:1,status:'pending',code,deviceName:'Money Tracker Windows',createdAt:serverTimestamp(),expiresAt:Timestamp.fromMillis(expiresAt),
+ });
+ return {sessionId,code,expiresAt,uid:user.uid};
 }
-export function pairQr(session:PairSession){return `moneytracker://pair?session=${encodeURIComponent(session.sessionId)}&code=${encodeURIComponent(session.code)}`;}
+export function pairQr(session:PairSession){
+ return `moneytracker://pair?uid=${encodeURIComponent(session.uid)}&session=${encodeURIComponent(session.sessionId)}&code=${encodeURIComponent(session.code)}`;
+}
 export async function checkPair(session:PairSession):Promise<'pending'|'approved'|'expired'|'used'>{
- const {functions}=assertOnline();const fn=httpsCallable<{sessionId:string;secret:string},{status:'pending'|'approved'|'expired'|'used'}>(functions,'pollPair');
- const r=await fn({sessionId:session.sessionId,secret:session.secret});return r.data.status;
+ const {auth,db}=assertOnline();if(auth.currentUser?.uid!==session.uid)throw Error('Pair session account mismatch');
+ if(Date.now()>session.expiresAt)return 'expired';
+ const snap=await getDoc(doc(db,'users',session.uid,'pairs',session.sessionId));
+ if(!snap.exists())return 'used';
+ const info=snap.data();
+ if(info.code!==session.code||info.schema!==1)throw Error('Pair verification mismatch');
+ if(info.expiresAt?.toMillis?.()<Date.now())return 'expired';
+ return info.status==='approved'?'approved':'pending';
 }
+/** This authorizes the Windows UI only. Firebase authentication was already completed with email/password. */
 export async function completePair(session:PairSession){
- const {functions,auth}=assertOnline();
- const fn=httpsCallable<{sessionId:string;secret:string},{customToken:string}>(functions,'completePair');
- const token=(await fn({sessionId:session.sessionId,secret:session.secret})).data.customToken;
- await signInWithCustomToken(auth,token);
+ const {auth,db}=assertOnline();if(auth.currentUser?.uid!==session.uid)throw Error('Pairing identity changed');
+ const status=await checkPair(session);if(status!=='approved')throw Error('Android approval missing');
+ // Best-effort cleanup. Expired entries can also be deleted by the signed-in owner.
+ try{await deleteDoc(doc(db,'users',session.uid,'pairs',session.sessionId));}catch{}
 }
 export async function logOut(){if(auth)await signOut(auth);}
 export function subscribeCloud(uid:string,onChange:(data:CloudEnvelope|null)=>void,onError:(error:Error)=>void):Unsubscribe{

@@ -1,6 +1,6 @@
 [package]
 name = "money-tracker-desktop"
-version = "0.1.0"
+version = "0.2.0"
 description = "Money Tracker for Windows"
 authors = ["Myominaung"]
 edition = "2021"

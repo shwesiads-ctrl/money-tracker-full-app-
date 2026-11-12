@@ -1,7 +1,6 @@
 import {initializeApp,type FirebaseApp} from 'firebase/app';
 import {getAuth,browserSessionPersistence,setPersistence,type Auth} from 'firebase/auth';
 import {getFirestore,type Firestore} from 'firebase/firestore';
-import {getFunctions,type Functions} from 'firebase/functions';
 const cfg={
  apiKey:import.meta.env.VITE_FIREBASE_API_KEY||'',
  authDomain:import.meta.env.VITE_FIREBASE_AUTH_DOMAIN||'',
@@ -10,12 +9,11 @@ const cfg={
 };
 export const firebaseConfigured=Object.values(cfg).every(Boolean);
 let app:FirebaseApp|undefined;
-export let auth:Auth|undefined,db:Firestore|undefined,functions:Functions|undefined;
+export let auth:Auth|undefined,db:Firestore|undefined;
 if(firebaseConfigured){
  app=initializeApp(cfg);
  auth=getAuth(app);
  // QR authentication is required again after closing the desktop session.
  void setPersistence(auth,browserSessionPersistence);
  db=getFirestore(app);
- functions=getFunctions(app,import.meta.env.VITE_FIREBASE_FUNCTIONS_REGION||'asia-southeast1');
 }

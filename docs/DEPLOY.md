@@ -1,75 +1,48 @@
-# Deployment checklist — Money Tracker Windows + Android
+# Money Tracker — Firebase Spark Free JSON Sync (no Cloud Functions)
 
-## 1. Firebase project
+## Services to enable — NO Blaze required within Spark quotas
 
-1. Create a project at https://console.firebase.google.com/. Cloud Functions for Firebase requires **Blaze pay-as-you-go** billing. Set a cost budget/alert and review quota usage. The regional functions in this package use `asia-southeast1` (Singapore).
-2. Register **one Firebase Web App** and copy its public configuration (`apiKey`, `authDomain`, `projectId`, `appId`). Do not use service-account credentials in the clients.
-3. Enable **Authentication → Sign-in method → Email/Password**; require email verification from the UI.
-4. Enable **Cloud Firestore**. Choose an appropriate location; changing database location later can require migration. Deploy restrictive Security Rules before real user data.
-5. Review Firebase **Authentication → Settings → Authorized domains**; do not add insecure production origins. The QR flow uses custom tokens rather than a popup/OAuth redirect.
-
-## 2. Deploy Cloud Functions & Firestore Rules
-
-Install Node 22+ and the Firebase CLI on your trusted computer:
+1. Create a free Firebase **Spark** project at https://console.firebase.google.com/.
+2. Register Firebase **Web app**. Copy only `apiKey`, `authDomain`, `projectId`, and `appId` into `windows/.env` (from `.env.example`) and Android `android/src/cloudConfig.ts`.
+3. Enable **Authentication → Email/Password**; verify the email address on both devices.
+4. Enable **Cloud Firestore Standard** with the free default database. Under Firestore → Rules, paste `firebase/firestore.rules`, or deploy from the CLI:
 
 ```bash
 npm install -g firebase-tools
 firebase login
 cd firebase
 cp .firebaserc.example .firebaserc
-# replace YOUR_FIREBASE_PROJECT_ID in .firebaserc
-cd functions
-npm install
-npm run build
-npm test
-cd ..
-firebase deploy --only functions,firestore:rules,storage
+# replace YOUR_FIREBASE_PROJECT_ID
+firebase deploy --only firestore:rules,firestore:indexes
 ```
 
-Functions: `startPair`, `pollPair`, `approvePair`, `completePair` in region `asia-southeast1`. Firestore document `users/{uid}/sync/main` is accessible only by its verified-email owner. Pairing and rate-limit collections are server-only.
+No Cloud Functions or Firebase Storage deployment. No service account JSON or admin private keys in clients.
 
-## 3. Android app Cloud Config
+## Windows device authorization via QR — no backend
 
-Update **`android/src/cloudConfig.ts`** with the *public* Firebase Web App config (safe for distributed clients, but restrict API keys in Google Cloud as appropriate). Keep the same project values as Windows. Sign in with a verified Firebase email account, then use **Upload Android → Firebase**. Keep the existing local sign-in/profile as the device lock. Build from `android/`:
+1. On Android, log into the Cloud Sync panel using Firebase Email/Password; verify email and **Upload Android → Firebase** (first device).
+2. On Windows, sign in using the **same verified Firebase Email/Password**. Windows creates `users/{uid}/pairs/{sessionId}` with a random one-time code and 2-minute expiry, then shows its QR.
+3. On Android open **Scan Windows Device QR**, check matching digits, tap **Approve**.
+4. Windows observes the approved JSON document and unlocks its dashboard. It marks the pairing complete and deletes the used document.
 
-```bash
-npm install
-npm run test:core
-npm run typecheck
-npx expo prebuild --platform android --no-install
-cd android
-./gradlew :app:assembleRelease
-```
+**Security**: Windows account authentication MUST happen first. The QR confirmation does not issue identity tokens and cannot securely replace password login without a trusted server. It is a user confirmation layer, NOT Firebase MFA. Firestore Rules limit pairing documents and financial data to the same authenticated, verified UID. A client signed into the same account can still write its own pair document, so do not describe QR as a cryptographically independent second factor.
 
-On Windows replace `./gradlew` with `gradlew.bat`; Java 17 / Android SDK needed. Native QR scanning requires camera permission. The app still works offline without cloud credentials, showing an explanatory setup message.
+## Cloud JSON storage
 
-## 4. Windows executable
+`users/{uid}/sync/main` document: `{schema:1, revision:integer, deviceId:string, payload:{wallets, categories, transactions, budgets, settings, recurring, categoryBudgets, debts, debtPayments, goals, goalContributions, recurringOccurrences}, updatedAt:timestamp}`.
 
-Edit `windows/.env` using `windows/.env.example` to fill the **same public config**. From Windows 11 with Visual C++ Build Tools, Rust MSVC toolchain and WebView2 installed:
+The `revision` is incremented atomically, and mismatched revisions are rejected. Conflicts require manual review. Cloud JSON is **not end-to-end encrypted**; do not put local PIN, recovery key, device secrets or receipt file paths in it. Local financial SQLite remains the primary Android store. Firestore document limit applies; migrate to per-record sync for larger ledgers.
 
-```powershell
-cd windows
-npm install
-npm test
-npm run build
-npm run tauri build -- --bundles nsis
-```
+Firestore Spark limits (subject to change): one free database, 1 GiB storage, 50,000 reads/day, 20,000 writes/day and 20,000 deletes/day. Exceeding free limits may block usage until quotas reset; no Blaze billing upgrade is needed for this foundation.
 
-The `.exe` installer is under `windows/src-tauri/target/release/bundle/nsis/`. GitHub Actions workflow `.github/workflows/windows-build.yml` can compile on a Windows runner after the source is committed. Set GitHub Actions **repository secrets/vars** for the Firebase public config before release builds if you want a preconfigured executable; never include service account secrets. The current workflow builds a safe **unconfigured preview** unless you provide configuration during build.
+## Test
 
-## 5. Acceptance test before use
+- Android and Windows must be configured for the same Firebase project and verified UID. Try cross-account access (must be denied) and expired QR approval (must fail).
+- With no server runtime, there is no Cloud Functions deployment/test. Use `cd windows && npm install && npm test && npm run build`. For Android, `cd android && npm install && npm run test:core && npm run typecheck` and native APK build.
+- Test with demo transactions. On Android make an encrypted backup before syncing. Do not uninstall the existing APK; installer signing/version compatibility must be checked.
+- Windows local auth sessions are not persisted after closing. Each new Windows session requires Firebase login and Android QR approval.
+- Receipt photos, local PINs, recovery keys, biometric data and scheduled reminders remain device-local. Live automatic conflict-free two-way sync is **not** implemented; supported sync is explicit upload/download and Windows Firestore subscription.
 
-- Test QR expiration after 120s; wrong code rejected; a QR cannot be used twice; Windows QR **never contains the desktop secret**.
-- Test Android email verification required for Cloud Functions and Firestore owner-only rules; account A cannot read account B.
-- Test phone denial and cancellation, device loss, Firebase password reset and logout on Windows.
-- Test first Android upload → Windows dashboard, Windows new transaction → Android download, duplicate IDs and revision conflicts.
-- Test disconnected/online state, 2,000+ transactions, large data sets and Firestore document size limitations.
-- Test with copied **non-sensitive demo data first**. Verify local SQLite, login/biometric state, recurring occurrences and existing receipt attachments survive before enabling cloud sync on real data.
-- Test signing certificate compatibility with installed Android v2.5.2. Do not uninstall the current application just to replace it.
+## Optional JSON-file-only mode
 
-## 6. Production hardening still required
-
-- Robust App Check compatible with Tauri and Android; server-side abuse prevention, per-account device revocation, session inventory and audited logout.
-- Incremental per-record sync with tombstones, idempotent posted recurring transactions, conflict UI and offline outbox. Do **not** enable automatic two-way overwrites until these are implemented and tested.
-- Optional end-to-end encryption of financial payloads and receipt photos with secure cross-device key transfer.
-- Full Firebase emulator Firestore rules tests, real-device QR camera tests, and Windows installer signing and antivirus QA.
+A plain downloadable JSON file with no authenticated database is unsafe for private financial data and cannot support secure QR device approval. Use Firestore JSON documents and owner-only Rules instead.

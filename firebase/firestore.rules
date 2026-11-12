@@ -29,7 +29,32 @@ service cloud.firestore {
        && validSync(request.resource.data) && request.resource.data.revision == resource.data.revision + 1;
    allow delete: if false;
   }
-  // All pairing, rate limits and identity issuance are restricted to Cloud Functions/Admin SDK.
+  // Spark plan: both devices are ALREADY signed into the same verified Firebase UID.
+  // This is an owner-only UI device confirmation, NOT server-enforced MFA or token issuance.
+  match /users/{uid}/pairs/{sessionId} {
+   allow get: if owner(uid);
+   allow list: if false;
+   allow create: if owner(uid)
+    && sessionId.matches('^[0-9a-f]{48}$')
+    && request.resource.data.keys().hasOnly(['schema','status','code','deviceName','createdAt','expiresAt'])
+    && request.resource.data.schema == 1
+    && request.resource.data.status == 'pending'
+    && request.resource.data.code is string
+    && request.resource.data.code.matches('^[0-9]{6}$')
+    && request.resource.data.deviceName == 'Money Tracker Windows'
+    && request.resource.data.createdAt == request.time
+    && request.resource.data.expiresAt is timestamp
+    && request.resource.data.expiresAt > request.time
+    && request.resource.data.expiresAt <= request.time + duration.value(3,'m');
+   allow update: if owner(uid)
+    && resource.data.status == 'pending'
+    && resource.data.expiresAt > request.time
+    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','approvedAt'])
+    && request.resource.data.status == 'approved'
+    && request.resource.data.approvedAt == request.time;
+   allow delete: if owner(uid) && (resource.data.status == 'approved' || resource.data.expiresAt < request.time);
+  }
+  // Unused server-only collections remain inaccessible.
   match /pairSessions/{id} { allow read, write: if false; }
   match /pairRate/{id} { allow read, write: if false; }
   match /{document=**} { allow read, write: if false; }
