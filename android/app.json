@@ -2,13 +2,14 @@
   "expo": {
     "name": "Money Tracker",
     "slug": "money-tracker-ts",
-    "version": "2.5.2",
+    "version": "2.6.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "android": {
       "package": "com.shwesiads.moneytracker",
-      "versionCode": 8,
+      "versionCode": 9,
       "permissions": [
+        "CAMERA",
         "POST_NOTIFICATIONS"
       ],
       "adaptiveIcon": {
@@ -50,7 +51,7 @@
             {
               "name": "MoneyWidget",
               "displayName": "Money Tracker • Balance",
-              "description": "Dark balance and income/expense widget",
+              "description": "Dark balance, monthly income and expenses, optional privacy mode",
               "android": {
                 "minWidth": 180,
                 "minHeight": 110,
@@ -63,7 +64,7 @@
             {
               "name": "MoneyWidgetSmall",
               "displayName": "Money Tracker • Compact",
-              "description": "Compact, privacy-friendly money balance",
+              "description": "Compact, private money balance widget",
               "android": {
                 "minWidth": 120,
                 "minHeight": 110,
@@ -74,6 +75,12 @@
               }
             }
           ]
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Money Tracker to scan your Windows login QR code."
         }
       ]
     ],

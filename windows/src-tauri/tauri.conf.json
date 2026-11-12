@@ -1,0 +1,6 @@
+{
+  "$schema":"https://schema.tauri.app/config/2", "productName":"Money Tracker", "version":"0.1.0", "identifier":"com.myominaung.moneytracker.windows",
+  "build":{"beforeDevCommand":"npm run dev","devUrl":"http://localhost:1420","beforeBuildCommand":"npm run build","frontendDist":"../dist"},
+  "app":{"windows":[{"title":"Money Tracker — Windows","width":1280,"height":820,"minWidth":860,"minHeight":620,"backgroundColor":"#081320"}],"security":{"csp":null}},
+  "bundle":{"active":true,"targets":["nsis"],"icon":["icons/icon.ico","icons/icon.png"],"windows":{"nsis":{"displayLanguageSelector":false}}}
+}

@@ -45,17 +45,35 @@ jobs:
       - name: Expo prebuild
         working-directory: android
         run: npx expo prebuild --platform android --no-install
-      - name: Verify native widget receiver after prebuild
+      - name: Verify Android widget receiver registration
         working-directory: android
         run: |
           set -euo pipefail
           manifest=android/app/src/main/AndroidManifest.xml
           test -f "$manifest"
+          # Presence of the APPWIDGET_UPDATE receiver is mandatory; a successful Gradle
+          # build alone does not guarantee the widget is discoverable by launchers.
           grep -q 'android.appwidget.action.APPWIDGET_UPDATE' "$manifest"
           grep -q 'android.appwidget.provider' "$manifest"
           test "$(grep -c 'android.appwidget.action.APPWIDGET_UPDATE' "$manifest")" -ge 2
-          echo "PASS: Android native widget receiver registered"
-      - name: Verify text cleanup
+          echo 'PASS: Native Android manifest includes an AppWidgetProvider receiver'
+      - name: Verify both widget variants and privacy defaults
+        working-directory: android
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const config=require('./app.json');
+          const widgets=config.expo.plugins.find(p=>Array.isArray(p)&&p[0]==='expo-widgets')[1].widgets;
+          if(widgets.length!==2)throw Error('Expected two Android widget sizes');
+          for(const w of widgets){
+            if(!fs.existsSync('android/../'+w.android.initialLayout.slice(2)))throw Error('Missing widget initial layout: '+w.name);
+            const code=fs.readFileSync(w.android.initialLayout.slice(2),'utf8');
+            if(!code.includes("isPrivate:true"))throw Error('Missing privacy-first widget state: '+w.name);
+            if(!code.includes("background('#112235')"))throw Error('Missing widget card background: '+w.name);
+          }
+          console.log('PASS: two dark theme widgets with privacy-first initial layout');
+          NODE
+      - name: Verify no obsolete UI footer copy
         working-directory: android
         run: |
           set -euo pipefail
@@ -72,13 +90,13 @@ jobs:
           set -euo pipefail
           apk="$(find android/android/app/build/outputs/apk/release -maxdepth 1 -name '*.apk' -type f | head -1)"
           test -s "$apk"
-          cp "$apk" Money_Tracker_Android_v2.5.2.apk
-          if gh release view v2.5.2 >/dev/null 2>&1; then
-            gh release upload v2.5.2 Money_Tracker_Android_v2.5.2.apk --clobber
+          cp "$apk" Money_Tracker_Android_v2.6.0_Cloud_Preview.apk
+          if gh release view v2.6.0-cloud-preview >/dev/null 2>&1; then
+            gh release upload v2.6.0-cloud-preview Money_Tracker_Android_v2.6.0_Cloud_Preview.apk --clobber
           else
-            gh release create v2.5.2 Money_Tracker_Android_v2.5.2.apk \
+            gh release create v2.6.0-cloud-preview Money_Tracker_Android_v2.6.0_Cloud_Preview.apk \
               --target "$GITHUB_SHA" \
-              --title "Money Tracker Android v2.5.2 (Testing APK)" \
-              --notes "Money Tracker Android v2.5.2 testing APK: widget initial layout, receiver verification, all-tab Back OK/Cancel confirmation, unwanted footer removal. Device QA pending; back up finance data first." \
+              --title "Money Tracker Android v2.6.0 Cloud Preview (Testing APK)" \
+              --notes "Money Tracker v2.6.0-cloud-preview Widget UI redesign: dark card, compact 2x2 and medium 4x2 widget, balance typography, monthly income/expenses and privacy-first defaults. Keep data backups. Physical Android launcher QA pending." \
               --prerelease
           fi

@@ -1,0 +1,47 @@
+name: Build Money Tracker Windows Installer
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'windows/**'
+      - '.github/workflows/windows-build.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  windows-installer:
+    runs-on: windows-2025
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install Windows WebView2 / NSIS dependencies
+        shell: pwsh
+        run: rustc --version; node --version
+      - name: Install app dependencies
+        working-directory: windows
+        run: npm install --no-audit --no-fund
+      - name: Tests
+        working-directory: windows
+        run: npm test
+      - name: Typecheck & frontend build
+        working-directory: windows
+        run: npm run build
+      - name: Build Windows installer
+        working-directory: windows
+        run: npm run tauri build -- --bundles nsis
+      - name: Publish installer as private prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem 'windows/src-tauri/target/release/bundle/nsis/*-setup.exe' | Select-Object -First 1
+          if (!$exe) { throw 'NSIS .exe not found' }
+          Copy-Item $exe.FullName Money_Tracker_Windows_v0.1.0_Setup.exe
+          gh release view windows-v0.1.0 > $null 2>&1
+          if ($LASTEXITCODE -eq 0) { gh release upload windows-v0.1.0 Money_Tracker_Windows_v0.1.0_Setup.exe --clobber }
+          else { gh release create windows-v0.1.0 Money_Tracker_Windows_v0.1.0_Setup.exe --target $env:GITHUB_SHA --title 'Money Tracker Windows v0.1.0 (Firebase QR Preview)' --notes 'Windows Tauri installer foundation. Firebase project config and Cloud Functions deployment required for live pairing and sync. No embedded secrets; testing only.' --prerelease }

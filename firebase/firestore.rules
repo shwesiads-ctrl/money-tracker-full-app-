@@ -1,0 +1,37 @@
+rules_version = '2';
+service cloud.firestore {
+ match /databases/{database}/documents {
+  function owner(uid) {
+   return request.auth != null && request.auth.uid == uid && request.auth.token.email_verified == true;
+  }
+  function validSync(d) {
+   return d.keys().hasOnly(['schema','revision','deviceId','payload','updatedAt'])
+    && d.keys().hasAll(['schema','revision','deviceId','payload','updatedAt'])
+    && d.schema == 1 && d.revision is int && d.revision > 0
+    && d.deviceId is string && d.deviceId.size() > 0 && d.deviceId.size() <= 72
+    && d.payload is map && d.payload.keys().hasAll(['wallets','categories','transactions','budgets','settings',
+       'recurring','categoryBudgets','debts','debtPayments','goals','goalContributions','recurringOccurrences'])
+    && d.payload.wallets is list && d.payload.wallets.size() <= 50
+    && d.payload.categories is list && d.payload.categories.size() <= 100
+    && d.payload.transactions is list && d.payload.transactions.size() <= 2000
+    && d.payload.budgets is list && d.payload.budgets.size() <= 3
+    && d.payload.recurring is list && d.payload.categoryBudgets is list
+    && d.payload.debts is list && d.payload.debtPayments is list
+    && d.payload.goals is list && d.payload.goalContributions is list
+    && d.payload.recurringOccurrences is list
+    && d.updatedAt == request.time;
+  }
+  match /users/{uid}/sync/{docId} {
+   allow read: if owner(uid) && docId == 'main';
+   allow create: if owner(uid) && docId == 'main'
+       && validSync(request.resource.data) && request.resource.data.revision == 1;
+   allow update: if owner(uid) && docId == 'main'
+       && validSync(request.resource.data) && request.resource.data.revision == resource.data.revision + 1;
+   allow delete: if false;
+  }
+  // All pairing, rate limits and identity issuance are restricted to Cloud Functions/Admin SDK.
+  match /pairSessions/{id} { allow read, write: if false; }
+  match /pairRate/{id} { allow read, write: if false; }
+  match /{document=**} { allow read, write: if false; }
+ }
+}

@@ -12,6 +12,7 @@ import type {Account} from './account';
 import ProfileSettings from './ProfileSettings';
 import ReminderSettings from './ReminderSettings';
 import AboutPanel from './AboutPanel';
+import CloudSyncPanel from './CloudSyncPanel';
 import { mainBackAction } from './backPolicy';
 import { confirmExit } from './exitDialog';
 import FeatureHub from './FeatureHub';
@@ -338,6 +339,7 @@ export default function Tracker({account,onLock,onUpdateProfile,onChangePassword
     <Panel c={c}><SectionHeader c={c}>{prefs.language==='my'?'ငွေကြေးကိရိယာများ':'Financial Tools'}</SectionHeader>
       <Action c={c} tone="primary" label={prefs.language==='my'?'Recurring / Budget / Debt / Goals':'Manage Recurring / Budgets / Debts / Goals'} onPress={()=>setPage('features')}/>
     </Panel>
+    <CloudSyncPanel onChanged={refresh}/>
     <ReminderSettings db={db} lang={prefs.language} c={c}/>
     <ProfileSettings account={account} language={prefs.language} onLock={onLock} onUpdateProfile={onUpdateProfile} onChangePassword={onChangePassword} onRegenerateRecovery={onRegenerateRecovery} onBiometric={onBiometric}/>
     <Panel c={c}><SectionHeader c={c}>{t.settings}</SectionHeader>
