@@ -14,7 +14,7 @@ permissions:
 jobs:
   apk:
     name: Compile and upload testing APK
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     env:
       CI: '1'
@@ -82,6 +82,16 @@ jobs:
       - name: Build standalone APK (temporary testing signature)
         working-directory: android/android
         run: chmod +x ./gradlew && ./gradlew :app:assembleRelease --no-daemon
+      # Try to make a chat-downloadable ZIP. A full artifact quota must not block the release.
+      - name: Upload APK artifact (optional)
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: money-tracker-v2.6.4-apk
+          path: android/android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+          retention-days: 3
+          compression-level: 0
       # The previous Actions artifact upload hit the repository storage quota.
       - name: Publish APK as private prerelease asset
         env:
