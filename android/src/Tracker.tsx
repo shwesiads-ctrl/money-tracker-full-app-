@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
 import { ActivityIndicator, Alert, BackHandler, KeyboardAvoidingView, Platform, RefreshControl, SafeAreaView, ScrollView, Image, StatusBar as RNStatusBar, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import type { ReactNode } from 'react';
 import { useSQLiteContext } from 'expo-sqlite';
@@ -134,7 +134,7 @@ const formDefault = () => ({type:'expense' as Mode, amount:'', description:'', d
 type AuthProps={account:Account;onLock:()=>void;onUpdateProfile:(name:string,photo:boolean)=>Promise<void>;onChangePassword:(oldPassword:string,newPassword:string)=>Promise<void>;onRegenerateRecovery:(password:string)=>Promise<string>;onBiometric:(enabled:boolean)=>Promise<void>};
 export default function Tracker({account,onLock,onUpdateProfile,onChangePassword,onRegenerateRecovery,onBiometric}:AuthProps){
   const db=useSQLiteContext();
-  const scrollRef=useRef<ScrollView>(null);
+  const scrollRef=useRef<ComponentRef<typeof ScrollView>>(null);
   const [snapshot,setSnapshot]=useState<Snapshot|null>(null);
   const [page,setPage]=useState<Page>('home');
   const [settingsSection,setSettingsSection]=useState<SettingsSection|null>(null);
