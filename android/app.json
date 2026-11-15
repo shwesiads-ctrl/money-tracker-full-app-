@@ -2,12 +2,12 @@
   "expo": {
     "name": "Money Tracker",
     "slug": "money-tracker-ts",
-    "version": "2.6.3",
+    "version": "2.6.4",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "android": {
       "package": "com.shwesiads.moneytracker",
-      "versionCode": 12,
+      "versionCode": 13,
       "permissions": [
         "CAMERA",
         "POST_NOTIFICATIONS"

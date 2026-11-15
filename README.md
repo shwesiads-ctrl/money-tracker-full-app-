@@ -14,3 +14,10 @@ See `docs/DEPLOY.md` for setup and testing. No Firebase billing account/Blaze de
 ## v2.6.3 — Dashboard Period Cards
 
 Dashboard income/expense cards default to today's totals. Tap either card to choose Day / Week / Month / Year; labels and both amounts change together. Monday starts the week. Transfers do not contribute to income/expense. Existing monthly budget, reports, database and cloud preview remain unchanged. Android version code 12.
+
+## v2.6.4 — Transaction History pagination
+
+- Up to 20 transactions per page, Previous / Next navigation, shown-record range and page counter in Myanmar/English.
+- Search/date/type/wallet/currency filters reset pagination; deletion safely clamps the last page.
+- CSV export and Income/Expense totals include **all matching records**, not only the 20 shown.
+- No SQLite data migration. Android version code 13. Backup before updating.

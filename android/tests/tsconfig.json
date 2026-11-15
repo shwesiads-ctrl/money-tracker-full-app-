@@ -31,6 +31,8 @@
     "../src/settingsNavigation.ts",
     "./settingsNavigation.test.ts",
     "../src/dashboardPeriod.ts",
-    "./dashboardPeriod.test.ts"
+    "./dashboardPeriod.test.ts",
+    "../src/historyPagination.ts",
+    "./historyPagination.test.ts"
   ]
 }

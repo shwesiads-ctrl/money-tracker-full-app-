@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, BackHandler, KeyboardAvoidingView, Platform, RefreshControl, SafeAreaView, ScrollView, Image, StatusBar as RNStatusBar, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import type { ReactNode } from 'react';
 import { useSQLiteContext } from 'expo-sqlite';
@@ -18,6 +18,7 @@ import { confirmExit } from './exitDialog';
 import {analyticsRange,shiftAnalyticsAnchor,analyticsBuckets} from './analytics';
 import type {AnalyticsPeriod} from './analytics';
 import {dashboardSummary,dashboardPeriodLabel} from './dashboardPeriod';
+import {HISTORY_PAGE_SIZE,paginateHistory} from './historyPagination';
 import type {DashboardPeriod} from './dashboardPeriod';
 import {backDestination} from './settingsNavigation';
 import type {SettingsSection} from './settingsNavigation';
@@ -133,6 +134,7 @@ const formDefault = () => ({type:'expense' as Mode, amount:'', description:'', d
 type AuthProps={account:Account;onLock:()=>void;onUpdateProfile:(name:string,photo:boolean)=>Promise<void>;onChangePassword:(oldPassword:string,newPassword:string)=>Promise<void>;onRegenerateRecovery:(password:string)=>Promise<string>;onBiometric:(enabled:boolean)=>Promise<void>};
 export default function Tracker({account,onLock,onUpdateProfile,onChangePassword,onRegenerateRecovery,onBiometric}:AuthProps){
   const db=useSQLiteContext();
+  const scrollRef=useRef<ScrollView>(null);
   const [snapshot,setSnapshot]=useState<Snapshot|null>(null);
   const [page,setPage]=useState<Page>('home');
   const [settingsSection,setSettingsSection]=useState<SettingsSection|null>(null);
@@ -147,6 +149,7 @@ export default function Tracker({account,onLock,onUpdateProfile,onChangePassword
   const [editingId,setEditingId]=useState<string|null>(null);
   const [form,setForm]=useState(formDefault);
   const [search,setSearch]=useState('');
+  const [historyPage,setHistoryPage]=useState(1);
   const [historyType,setHistoryType]=useState('ALL');
   const [historyWallet,setHistoryWallet]=useState('ALL');
   const [historyFrom,setHistoryFrom]=useState('');
@@ -197,6 +200,8 @@ export default function Tracker({account,onLock,onUpdateProfile,onChangePassword
   const budget=snapshot?.budgets.find(b=>b.currency===currency)?.amount_minor||0;
   const budgetPercent=budget>0?Math.round(monthTotal.expense*100/budget):0;
   const historyItems=useMemo(()=>filterTransactions(currencyTx,{currency,search,type:historyType,wallet:historyWallet,from:historyFrom,to:historyTo}),[currencyTx,currency,search,historyType,historyWallet,historyFrom,historyTo]);
+  useEffect(()=>{setHistoryPage(1);},[currency,search,historyType,historyWallet,historyFrom,historyTo]);
+  const paginatedHistory=useMemo(()=>paginateHistory(historyItems,historyPage),[historyItems,historyPage]);
   const periodRange=useMemo(()=>analyticsPeriod==='custom'?{from:reportFrom,to:reportTo}:analyticsRange(analyticsPeriod,analyticsAnchor),[analyticsPeriod,analyticsAnchor,reportFrom,reportTo]);
   const reportItems=useMemo(()=>filterTransactions(currencyTx,{currency,from:periodRange.from,to:periodRange.to}),[currencyTx,currency,periodRange.from,periodRange.to]);
   const trend=useMemo(()=>analyticsPeriod==='custom'?[]:analyticsBuckets(currencyTx,analyticsPeriod,analyticsAnchor),[currencyTx,analyticsPeriod,analyticsAnchor]);
@@ -341,8 +346,15 @@ export default function Tracker({account,onLock,onUpdateProfile,onChangePassword
       <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center'}}><Label c={c} weight="700" color={c.muted}>{historyItems.length} {t.history}</Label><Action c={c} small tone="soft" label={t.exportCsv} onPress={()=>void act(()=>exportCsv(snapshot!,historyItems,currency))}/></View>
     </Panel>
     <Panel c={c}><View style={{flexDirection:'row',justifyContent:'space-between',marginBottom:8}}><View><Label c={c} color={c.muted} size={11}>{t.income}</Label><MoneyTag c={c} value={totals(historyItems).income} currency={currency} color={c.green} size={14}/></View><View><Label c={c} color={c.muted} size={11}>{t.expense}</Label><MoneyTag c={c} value={totals(historyItems).expense} currency={currency} color={c.red} size={14}/></View></View>
-      {historyItems.length?txRows(historyItems.slice(0,200)):<Label c={c} color={c.muted}>{t.empty}</Label>}
-      {historyItems.length>200&&<Label c={c} size={11} color={c.muted}>Showing first 200 records. Use filters or CSV export for more.</Label>}
+      {historyItems.length?txRows(paginatedHistory.items):<Label c={c} color={c.muted}>{t.empty}</Label>}
+      {historyItems.length>HISTORY_PAGE_SIZE&&<View style={{marginTop:16,paddingTop:14,borderTopWidth:1,borderColor:c.border,gap:12}}>
+        <Label c={c} color={c.muted} size={11} style={{textAlign:'center'}}>{prefs.language==='my'?'စာရင်း':'Showing'} {paginatedHistory.start}–{paginatedHistory.end} / {paginatedHistory.total}</Label>
+        <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8}}>
+          <Action c={c} small tone="soft" disabled={paginatedHistory.page===1} label={prefs.language==='my'?'‹ ယခင်':'‹ Previous'} onPress={()=>{setHistoryPage(paginatedHistory.page-1);scrollRef.current?.scrollTo({y:0,animated:true});}}/>
+          <Label c={c} size={12} weight="700" color={c.text}>{paginatedHistory.page} / {paginatedHistory.pageCount}</Label>
+          <Action c={c} small tone="soft" disabled={paginatedHistory.page===paginatedHistory.pageCount} label={prefs.language==='my'?'နောက် ›':'Next ›'} onPress={()=>{setHistoryPage(paginatedHistory.page+1);scrollRef.current?.scrollTo({y:0,animated:true});}}/>
+        </View>
+      </View>}
     </Panel>
   </>;
 
@@ -506,7 +518,7 @@ export default function Tracker({account,onLock,onUpdateProfile,onChangePassword
     <StatusBar style={prefs.dark_mode?'light':'dark'}/>
     {header}
     <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==='ios'?'padding':undefined}>
-      <ScrollView key={`${page}-${settingsSection??'menu'}`} keyboardShouldPersistTaps="handled" style={{flex:1}}
+      <ScrollView ref={scrollRef} key={`${page}-${settingsSection??'menu'}`} keyboardShouldPersistTaps="handled" style={{flex:1}}
         refreshControl={page==='add'?undefined:<RefreshControl refreshing={refreshing} onRefresh={()=>void onPullToRefresh()} colors={[c.accent]} tintColor={c.accent} progressBackgroundColor={c.panel} />}
         contentContainerStyle={{paddingHorizontal:15,paddingTop:16,paddingBottom:34}}>{screen}</ScrollView>
     </KeyboardAvoidingView>

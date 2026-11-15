@@ -90,13 +90,13 @@ jobs:
           set -euo pipefail
           apk="$(find android/android/app/build/outputs/apk/release -maxdepth 1 -name '*.apk' -type f | head -1)"
           test -s "$apk"
-          cp "$apk" Money_Tracker_Android_v2.6.3_Dashboard_Period.apk
-          if gh release view v2.6.3-dashboard-period >/dev/null 2>&1; then
-            gh release upload v2.6.3-dashboard-period Money_Tracker_Android_v2.6.3_Dashboard_Period.apk --clobber
+          cp "$apk" Money_Tracker_Android_v2.6.4_History_Pagination.apk
+          if gh release view v2.6.4-history-pagination >/dev/null 2>&1; then
+            gh release upload v2.6.4-history-pagination Money_Tracker_Android_v2.6.4_History_Pagination.apk --clobber
           else
-            gh release create v2.6.3-dashboard-period Money_Tracker_Android_v2.6.3_Dashboard_Period.apk \
+            gh release create v2.6.4-history-pagination Money_Tracker_Android_v2.6.4_History_Pagination.apk \
               --target "$GITHUB_SHA" \
-              --title "Money Tracker Android v2.6.3 Today Dashboard (Testing APK)" \
-              --notes "v2.6.3: Dashboard shows today's income and expenses by default. Tap either card for Day/Week/Month/Year totals; preserves monthly budget, reports, SQLite data, login and cloud preview. Back up before updating." \
+              --title "Money Tracker Android v2.6.4 History Pagination (Testing APK)" \
+              --notes "v2.6.4: History shows 20 records per page with Previous and Next. Filters apply before paging; CSV export still includes all matching transactions. Existing database and login preserved. Back up before updating." \
               --prerelease
           fi
